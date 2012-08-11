@@ -863,7 +863,7 @@ static int tclsystem_ifconfig_list(ClientData cd, Tcl_Interp *interp, int objc, 
 	int idx, iface_cnt;
 	int ioctl_ret, tcl_ret;
 
-	iface_req_len = iface_req_cnt * sizeof(iface_req);
+	iface_req_len = iface_req_cnt * sizeof(*iface_req);
 	iface_req = malloc(iface_req_len);
 	if (iface_req == NULL) {
 		/* Report failure */
