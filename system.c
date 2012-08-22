@@ -20,6 +20,7 @@
 #include <linux/route.h>
 #include <linux/if.h>
 #include <linux/if_arp.h>
+#include <linux/if_bridge.h>
 #include <linux/loop.h>
 #include <linux/fs.h>
 
@@ -117,6 +118,52 @@ static int tclsystem_internalproc_simplehash(ClientData cd, Tcl_Interp *interp, 
 	Tcl_SetObjResult(interp, hashval_obj);
 
 	return(TCL_OK);
+}
+
+static int tclsystem_internal_getsock(int *sock_v4_out, int *sock_v6_out) {
+	int sock_v4 = -1, sock_v6 = -1;
+	int sock;
+
+	if (sock_v4_out == NULL && sock_v6_out == NULL) {
+		return(-1);
+	}
+
+	if (sock_v4_out != NULL) {
+		/*
+		 * Check for IPv4 support before trying to create an IPv4 socket to
+		 * avoid demand-loading IPv4 (XXX: TODO)
+		 */
+		sock_v4 = socket(AF_INET, SOCK_DGRAM, 0);
+	}
+
+	if (sock_v6_out != NULL) {
+		/*
+		 * Check for IPv6 support before trying to create an IPv6 socket to
+		 * avoid demand-loading IPv6 (XXX: TODO)
+		 */
+		sock_v6 = socket(AF_INET6, SOCK_DGRAM, 0);
+	}
+
+	/* Pick a socket to query for the interface list */
+	if (sock_v4 == -1 && sock_v6 == -1) {
+		return(-1);
+	}
+
+	if (sock_v6 != -1) {
+		sock = sock_v6;
+	} else {
+		sock = sock_v4;
+	}
+
+	if (sock_v4_out != NULL) {
+		*sock_v4_out = sock_v4;
+	}
+
+	if (sock_v6_out != NULL) {
+		*sock_v6_out = sock_v6;
+	}
+
+	return(sock);
 }
 
 /*
@@ -1415,30 +1462,11 @@ static int tclsystem_ifconfig(ClientData cd, Tcl_Interp *interp, int objc, Tcl_O
 	int sock_v4, sock_v6, sock;
 	int retval = TCL_ERROR;
 
-	/*
-	 * Check for IPv4 support before trying to create an IPv4 socket to
-	 * avoid demand-loading IPv4 (XXX: TODO)
-	 */
-	sock_v4 = socket(AF_INET, SOCK_DGRAM, 0);
-
-	/*
-	 * Check for IPv6 support before trying to create an IPv6 socket to
-	 * avoid demand-loading IPv6 (XXX: TODO)
-	 */
-	sock_v6 = socket(AF_INET6, SOCK_DGRAM, 0);
-
-	/* Pick a socket to query for the interface list */
-	if (sock_v4 == -1 && sock_v6 == -1) {
-		/* Report failure */
+	sock = tclsystem_internal_getsock(&sock_v4, &sock_v6);
+	if (sock == -1) {
 		Tcl_SetObjResult(interp, Tcl_NewStringObj("unable to create socket", -1));
 
 		return(TCL_ERROR);
-	}
-
-	if (sock_v6 != -1) {
-		sock = sock_v6;
-	} else {
-		sock = sock_v4;
 	}
 
 	switch (objc) {
@@ -1660,30 +1688,11 @@ static int tclsystem_route(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj 
 	int sock_v4, sock_v6, sock;
 	int retval = TCL_ERROR;
 
-	/*
-	 * Check for IPv4 support before trying to create an IPv4 socket to
-	 * avoid demand-loading IPv4 (XXX: TODO)
-	 */
-	sock_v4 = socket(AF_INET, SOCK_DGRAM, 0);
-
-	/*
-	 * Check for IPv6 support before trying to create an IPv6 socket to
-	 * avoid demand-loading IPv6 (XXX: TODO)
-	 */
-	sock_v6 = socket(AF_INET6, SOCK_DGRAM, 0);
-
-	/* Pick a socket to query for the interface list */
-	if (sock_v4 == -1 && sock_v6 == -1) {
-		/* Report failure */
+	sock = tclsystem_internal_getsock(&sock_v4, &sock_v6);
+	if (sock == -1) {
 		Tcl_SetObjResult(interp, Tcl_NewStringObj("unable to create socket", -1));
 
 		return(TCL_ERROR);
-	}
-
-	if (sock_v6 != -1) {
-		sock = sock_v6;
-	} else {
-		sock = sock_v4;
 	}
 
 	switch (objc) {
@@ -1695,6 +1704,128 @@ static int tclsystem_route(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj 
 		default:
 			/* Otherwise, modify routes */
 			retval = tclsystem_route_conf(cd, interp, objc, objv, sock_v4, sock_v6);
+
+			break;
+	}
+
+	/* Cleanup */
+	if (sock_v4 != -1) {
+		close(sock_v4);
+	}
+
+	if (sock_v6 != -1) {
+		close(sock_v6);
+	}
+
+	return(retval);
+}
+
+static int tclsystem_brctl_list(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[], int sock) {
+	Tcl_SetObjResult(interp, Tcl_NewStringObj("not implemented", -1));
+
+	return(TCL_ERROR);
+}
+
+static int tclsystem_brctl_conf(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[], int sock) {
+	Tcl_Obj *operation_obj, *bridge_name_obj, *interface_name_obj;
+	unsigned long arg[4];
+	struct ifreq ifr;
+	int ioctl_ret, ioctl_id;
+	int add = 0;
+
+	/* Determine operation */
+	operation_obj = objv[1];
+	switch (tclsystem_internal_simplehash_obj(operation_obj)) {
+		case 0x1c993272: /* addbr */
+			add = 1;
+		case 0x4cbb3272: /* delbr */
+			if (objc != 3) {
+				if (add) {
+					Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"::system::syscall::brctl addbr bridge\"", -1));
+				} else {
+					Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"::system::syscall::brctl delbr bridge\"", -1));
+				}
+
+				return(TCL_ERROR);
+			}
+
+			bridge_name_obj = objv[2];
+
+			if (add) {
+				arg[0] = BRCTL_ADD_BRIDGE;
+			} else {
+				arg[0] = BRCTL_DEL_BRIDGE;
+			}
+
+			arg[1] = (unsigned long) Tcl_GetString(bridge_name_obj);
+			arg[2] = 0;
+
+			ioctl_ret = ioctl(sock, SIOCGIFBR, &arg); 
+
+			break;
+		case 0x1C9937E6: /* addif */
+			add = 1;
+		case 0x4cbb37e6: /* delif */
+			if (objc != 4) {
+				if (add) {
+					Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"::system::syscall::brctl addif bridge interface\"", -1));
+				} else {
+					Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"::system::syscall::brctl delif bridge interface\"", -1));
+				}
+
+				return(TCL_ERROR);
+			}
+
+			if (add) {
+				ioctl_id = SIOCBRADDIF;
+			} else {
+				ioctl_id = SIOCBRDELIF;
+			}
+
+			bridge_name_obj = objv[2];
+			interface_name_obj = objv[3];
+
+			memset(&ifr, 0, sizeof(ifr));
+			snprintf(ifr.ifr_name, IFNAMSIZ, "%s", Tcl_GetString(interface_name_obj));
+
+			ioctl_ret = ioctl(sock, SIOCGIFINDEX, (void *) &ifr);
+			if (ioctl_ret == 0) {
+				snprintf(ifr.ifr_name, IFNAMSIZ, "%s", Tcl_GetString(bridge_name_obj));
+				ioctl_ret = ioctl(sock, ioctl_id, (void *) &ifr);
+			}
+
+			break;
+	}
+
+	if (ioctl_ret < 0) {
+		Tcl_SetObjResult(interp, Tcl_NewStringObj(strerror(errno), -1));
+
+		return(TCL_ERROR);
+	}
+
+	return(TCL_OK);
+}
+
+static int tclsystem_brctl(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
+	int sock_v4, sock_v6, sock;
+	int retval = TCL_ERROR;
+
+	sock = tclsystem_internal_getsock(&sock_v4, &sock_v6);
+	if (sock == -1) {
+		Tcl_SetObjResult(interp, Tcl_NewStringObj("unable to create socket", -1));
+
+		return(TCL_ERROR);
+	}
+
+	switch (objc) {
+		case 0:
+		case 1: /* No arguments, list all bridges */
+			retval = tclsystem_brctl_list(cd, interp, objc, objv, sock);
+
+			break;
+		default:
+			/* Otherwise, modify routes */
+			retval = tclsystem_brctl_conf(cd, interp, objc, objv, sock);
 
 			break;
 	}
@@ -1750,6 +1881,7 @@ int System_Init(Tcl_Interp *interp) {
 	/* Network related commands */
 	Tcl_CreateObjCommand(interp, "::system::syscall::ifconfig", tclsystem_ifconfig, NULL, NULL);
 	Tcl_CreateObjCommand(interp, "::system::syscall::route", tclsystem_route, NULL, NULL);
+	Tcl_CreateObjCommand(interp, "::system::syscall::brctl", tclsystem_brctl, NULL, NULL);
 
 	/* Internal functions */
 	Tcl_CreateObjCommand(interp, "::system::internal::hash", tclsystem_internalproc_simplehash, NULL, NULL);
