@@ -1842,6 +1842,31 @@ static int tclsystem_brctl(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj 
 	return(retval);
 }
 
+static int tclsystem_vconfig(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
+	int sock_v4, sock_v6, sock;
+	int retval = TCL_ERROR;
+
+	sock = tclsystem_internal_getsock(&sock_v4, &sock_v6);
+	if (sock == -1) {
+		Tcl_SetObjResult(interp, Tcl_NewStringObj("unable to create socket", -1));
+
+		return(TCL_ERROR);
+	}
+
+	Tcl_SetObjResult(interp, Tcl_NewStringObj("not implemented", -1));
+
+	/* Cleanup */
+	if (sock_v4 != -1) {
+		close(sock_v4);
+	}
+
+	if (sock_v6 != -1) {
+		close(sock_v6);
+	}
+
+	return(retval);
+}
+
 int System_Init(Tcl_Interp *interp) {
 #ifdef USE_TCL_STUBS
 	const char *tclInitStubs_ret;
@@ -1882,6 +1907,7 @@ int System_Init(Tcl_Interp *interp) {
 	Tcl_CreateObjCommand(interp, "::system::syscall::ifconfig", tclsystem_ifconfig, NULL, NULL);
 	Tcl_CreateObjCommand(interp, "::system::syscall::route", tclsystem_route, NULL, NULL);
 	Tcl_CreateObjCommand(interp, "::system::syscall::brctl", tclsystem_brctl, NULL, NULL);
+	Tcl_CreateObjCommand(interp, "::system::syscall::vconfig", tclsystem_vconfig, NULL, NULL);
 
 	/* Internal functions */
 	Tcl_CreateObjCommand(interp, "::system::internal::hash", tclsystem_internalproc_simplehash, NULL, NULL);
