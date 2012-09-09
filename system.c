@@ -1878,14 +1878,18 @@ static int tclsystem_vconfig(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Ob
 }
 
 static int tclsystem_tsmf_start_svc(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
-	Tcl_Obj *filename_obj, *env_obj, *logfile_obj, **env_entry_objv;
+	struct timeval select_timeout;
+	Tcl_WideInt umask_tclval;
+	Tcl_Obj *filename_obj, *env_obj, *logfile_obj, **env_entry_objv, *cwd_obj, *umask_obj, *user_obj, *group_obj, *sri_obj;
 	pid_t child, child_pgid = -1;
 	ssize_t read_ret;
 	time_t currtime;
+	mode_t umask_val;
 	char *argv[3], *envv[512];
-	char *logfile, *filename;
+	char *logfile, *filename, *cwd, *user, *group;
 	char logmsg[2048];
-	int pipe_ret, setsid_ret, execve_ret, tcl_ret;
+	fd_set read_fdset;
+	int pipe_ret, setsid_ret, execve_ret, tcl_ret, select_ret;
 	int null_fd, log_fd, tmp_fd, max_fd;
 	int env_entry_objc;
 	int fds[2], fd;
@@ -1901,15 +1905,31 @@ static int tclsystem_tsmf_start_svc(ClientData cd, Tcl_Interp *interp, int objc,
 	}
 
 	/* 1.b. Identify Tcl_Objs to use for each argument */
+	sri_obj = objv[1];
 	filename_obj = objv[2];
 	logfile_obj = objv[3];
 	env_obj = objv[4];
+	cwd_obj = objv[5];
+	umask_obj = objv[6];
+	user_obj = objv[7];
+	group_obj = objv[8];
 
 	/* 1.c. Store string arguments */
 	filename = Tcl_GetString(filename_obj);
 	logfile = Tcl_GetString(logfile_obj);
+	cwd = Tcl_GetString(cwd_obj);
+	user = Tcl_GetString(user_obj);
+	group = Tcl_GetString(group_obj);
 
-	/* 1.d. Process environment */
+	/* 1.d. Integer objects */
+	tcl_ret = Tcl_GetWideIntFromObj(interp, umask_obj, &umask_tclval);
+	if (tcl_ret != TCL_OK) {
+		return(tcl_ret);
+	}
+
+	umask_val = umask_tclval;
+
+	/* 1.e. Process environment */
 	tcl_ret = Tcl_ListObjGetElements(interp, env_obj, &env_entry_objc, &env_entry_objv);
 	if (tcl_ret != TCL_OK) {
 		return(tcl_ret);
@@ -1943,7 +1963,28 @@ static int tclsystem_tsmf_start_svc(ClientData cd, Tcl_Interp *interp, int objc,
 		fd = fds[0];
 
 		/* 4.parent.b. Read process group ID of child from pipe */
-		read_ret = read(fd, &child_pgid, sizeof(child_pgid));
+		select_timeout.tv_sec = 30;
+		select_timeout.tv_usec = 0;
+
+		FD_ZERO(&read_fdset);
+		FD_SET(fd, &read_fdset);
+
+		select_ret = select(fd + 1, &read_fdset, NULL, NULL, &select_timeout);
+		if (select_ret == 0) {
+			/* On timeout, terminate starting process */
+			child_pgid = getpgid(child);
+			if (child_pgid != ((pid_t) -1)) {
+				kill(-child_pgid, SIGKILL);
+			}
+
+			Tcl_SetObjResult(interp, Tcl_NewStringObj("timeout", -1));
+
+			return(TCL_ERROR);
+		}
+
+		if (select_ret > 0) {
+			read_ret = read(fd, &child_pgid, sizeof(child_pgid));
+		}
 
 		/* 4.parent.c. Close read end of pipe */
 		close(fd);
@@ -1982,12 +2023,10 @@ static int tclsystem_tsmf_start_svc(ClientData cd, Tcl_Interp *interp, int objc,
 
 	/* 6. Setup environment */
 	/* 6.a. Set umask */
-	/* XXX: TODO */
-	umask(022);
+	umask(umask_val);
 
 	/* 6.b. Set working directory */
-	/* XXX: TODO */
-	chdir("/");
+	chdir(cwd);
 
 	/* 6.c. Open log file for stderr and stdout */
 	log_fd = open(logfile, O_WRONLY | O_CREAT | O_APPEND, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
