@@ -8,12 +8,14 @@
 #include <sys/ioctl.h>
 #include <sys/swap.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <stdlib.h>
 #include <signal.h>
 #include <unistd.h>
 #include <string.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <time.h>
 #include <tcl.h>
 
 #include <linux/sockios.h>
@@ -38,6 +40,14 @@
 #endif
 #ifndef MS_MOVE
 #define MS_MOVE 8192
+#endif
+
+/* Simple macros */
+#ifndef MAX
+#define MAX(a, b) (((a) < (b)) ? (b) : (a))
+#endif
+#ifndef MIN
+#define MIN(a, b) (((a) < (b)) ? (a) : (b))
 #endif
 
 /* User environment, for execve */
@@ -1867,6 +1877,211 @@ static int tclsystem_vconfig(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Ob
 	return(retval);
 }
 
+static int tclsystem_tsmf_start_svc(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
+	Tcl_Obj *filename_obj, *env_obj, *logfile_obj, **env_entry_objv;
+	pid_t child, child_pgid = -1;
+	ssize_t read_ret;
+	time_t currtime;
+	char *argv[3], *envv[512];
+	char *logfile, *filename;
+	char logmsg[2048];
+	int pipe_ret, setsid_ret, execve_ret, tcl_ret;
+	int null_fd, log_fd, tmp_fd, max_fd;
+	int env_entry_objc;
+	int fds[2], fd;
+	int status;
+	int idx;
+
+	/* 1. Parse arguments */
+	/* 1.a. Ensure the correct number of arguments were passed */
+	if (objc != 9) {
+		Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"::system::syscall::tsmf_start_svc sri filename logfile env cwd umask user group\"", -1));
+
+		return(TCL_ERROR);
+	}
+
+	/* 1.b. Identify Tcl_Objs to use for each argument */
+	filename_obj = objv[2];
+	logfile_obj = objv[3];
+	env_obj = objv[4];
+
+	/* 1.c. Store string arguments */
+	filename = Tcl_GetString(filename_obj);
+	logfile = Tcl_GetString(logfile_obj);
+
+	/* 1.d. Process environment */
+	tcl_ret = Tcl_ListObjGetElements(interp, env_obj, &env_entry_objc, &env_entry_objv);
+	if (tcl_ret != TCL_OK) {
+		return(tcl_ret);
+	}
+
+	for (idx = 0; idx < MIN(env_entry_objc, sizeof(envv) / sizeof(envv[0]) - 1); idx++) {
+		envv[idx] = Tcl_GetString(env_entry_objv[idx]);
+	}
+	envv[idx] = NULL;
+
+	/* 2. Create a pipe for communication between the processes */
+	pipe_ret = pipe(fds);
+	if (pipe_ret != 0) {
+		Tcl_SetObjResult(interp, Tcl_NewStringObj("pipe failed", -1));
+
+		return(TCL_ERROR);
+	}
+
+	/* 3. Fork into a new process */
+	child = fork();
+	if (child == ((pid_t) -1)) {
+		Tcl_SetObjResult(interp, Tcl_NewStringObj("fork failed", -1));
+
+		return(TCL_ERROR);
+	}
+
+	if (child != 0) {
+		/* 4.parent. Get PGID from child */
+		/* 4.parent.a. Close write end of pipe -- we are read-only */
+		close(fds[1]);
+		fd = fds[0];
+
+		/* 4.parent.b. Read process group ID of child from pipe */
+		read_ret = read(fd, &child_pgid, sizeof(child_pgid));
+
+		/* 4.parent.c. Close read end of pipe */
+		close(fd);
+
+		/* 4.parent.d. Verify read was meaningful */
+		if (read_ret != sizeof(child_pgid)) {
+			Tcl_SetObjResult(interp, Tcl_NewStringObj("failed to communicate with started service", -1));
+
+			return(TCL_ERROR);
+		}
+
+		/* 4.parent.e. If the PGID given is actually an error, return error */
+		if (child_pgid == ((pid_t) -1)) {
+			Tcl_SetObjResult(interp, Tcl_NewStringObj("service failed to start", -1));
+
+			return(TCL_ERROR);
+		}
+
+		/* 4.parent.f. Return PGID to Tcl */
+		Tcl_SetObjResult(interp, Tcl_NewWideIntObj((Tcl_WideInt) child_pgid));
+
+		return(TCL_OK);
+	}
+
+	/* 4.child.a. Close read end of pipe -- we only write to it */
+	close(fds[0]);
+	fd = fds[1];
+
+	/* 5. Create a new session */
+	setsid_ret = setsid();
+	if (setsid_ret == ((pid_t) -1)) {
+		write(fd, &child_pgid, sizeof(child_pgid));
+
+		_exit(0);
+	}
+
+	/* 6. Setup environment */
+	/* 6.a. Set umask */
+	/* XXX: TODO */
+	umask(022);
+
+	/* 6.b. Set working directory */
+	/* XXX: TODO */
+	chdir("/");
+
+	/* 6.c. Open log file for stderr and stdout */
+	log_fd = open(logfile, O_WRONLY | O_CREAT | O_APPEND, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+
+	/* 6.d. Open "/dev/null" for stdin */
+	null_fd = open("/dev/null", O_RDONLY);
+	if (null_fd < 0 || log_fd <0) {
+		write(fd, &child_pgid, sizeof(child_pgid));
+
+		_exit(0);
+	}
+
+	/* 6.e. Redirect stdin, stdout, and stderr to null, logs */
+	dup2(null_fd, STDIN_FILENO);
+	dup2(log_fd, STDOUT_FILENO);
+	dup2(log_fd, STDERR_FILENO);
+
+	close(null_fd);
+	close(log_fd);
+
+	/* 6.f. Close stray file descriptors */
+	max_fd = MAX(MAX(MAX(1024, STDIN_FILENO), STDOUT_FILENO), STDERR_FILENO);
+	for (tmp_fd = 0; tmp_fd < max_fd; tmp_fd++) {
+		if (tmp_fd == STDIN_FILENO || tmp_fd == STDOUT_FILENO || tmp_fd == STDERR_FILENO) {
+			continue;
+		}
+
+		if (tmp_fd == fd) {
+			continue;
+		}
+
+		close(tmp_fd);
+	}
+
+	/* 6.g. Switch to appropriate user/group */
+	/* 6.g.i. Group */
+	/* XXX: TODO */
+
+	/* 6.g.ii. User */
+	/* XXX: TODO */
+
+	/* 7. Create a new process to actually spawn the process */
+	child = fork();
+	if (child == ((pid_t) -1)) {
+		write(fd, &child_pgid, sizeof(child_pgid));
+
+		_exit(0);
+	}
+
+	if (child != 0) {
+		/* 7.parent.a. Wait for child process to terminate and collect status */
+		waitpid(child, &status, 0);
+
+		/* 7.parent.b. Set PGID (if successful, -1 otherwise) to pass back to TSMF */
+		if (status == 0) {
+			child_pgid = getpgid(getpid());
+		}
+		write(fd, &child_pgid, sizeof(child_pgid));
+
+		close(fd);
+
+		/* 7.parent.c. Write log of result */
+		/* Note: We avoid ANSI I/O here in case there is already something in the buffer */
+		currtime = time(NULL);
+		strftime(logmsg, sizeof(logmsg), "[ %b %e %H:%M:%S ", localtime(&currtime));
+		write(STDERR_FILENO, logmsg, strlen(logmsg));
+
+		snprintf(logmsg, sizeof(logmsg), "Method \"start\" exited with status %i ]\n", WEXITSTATUS(status));
+		write(STDERR_FILENO, logmsg, strlen(logmsg));
+
+		_exit(0);
+	}
+	
+	/* 7.child.a. Close channel to parent */
+	close(fd);
+
+	/* 8. Log attempt to run start method */
+	currtime = time(NULL);
+	strftime(logmsg, sizeof(logmsg), "[ %b %e %H:%M:%S ", localtime(&currtime));
+	write(STDERR_FILENO, logmsg, strlen(logmsg));
+
+	snprintf(logmsg, sizeof(logmsg), "Executing start method (\"%s\") ]\n", filename);
+	write(STDERR_FILENO, logmsg, strlen(logmsg));
+
+	/* 9. execve() new image */
+	argv[0] = filename;
+	argv[1] = "start";
+	argv[2] = NULL;
+	execve_ret = execve(filename, argv, envv);
+
+	/* 10. Abort if something has gone wrong */
+	_exit(execve_ret);
+}
+
 int System_Init(Tcl_Interp *interp) {
 #ifdef USE_TCL_STUBS
 	const char *tclInitStubs_ret;
@@ -1908,6 +2123,9 @@ int System_Init(Tcl_Interp *interp) {
 	Tcl_CreateObjCommand(interp, "::system::syscall::route", tclsystem_route, NULL, NULL);
 	Tcl_CreateObjCommand(interp, "::system::syscall::brctl", tclsystem_brctl, NULL, NULL);
 	Tcl_CreateObjCommand(interp, "::system::syscall::vconfig", tclsystem_vconfig, NULL, NULL);
+
+	/* Service (TSMF) related commands */
+	Tcl_CreateObjCommand(interp, "::system::syscall::tsmf_start_svc", tclsystem_tsmf_start_svc, NULL, NULL);
 
 	/* Internal functions */
 	Tcl_CreateObjCommand(interp, "::system::internal::hash", tclsystem_internalproc_simplehash, NULL, NULL);
