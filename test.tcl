@@ -4,6 +4,8 @@ puts [exec ./build-dyn.sh]
 
 load ./system.so
 
+::system::syscall::tsmf_start_svc blah /bin/true /tmp/logfile [list PATH=/bin] / 022 root root
+
 foreach iface [system::syscall::ifconfig] {
 #lo0:2: flags=2001000849<UP,LOOPBACK,RUNNING,MULTICAST,IPv4,VIRTUAL> mtu 8232 index 1
 #        inet 127.0.0.1 netmask ff000000 

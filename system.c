@@ -3,6 +3,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
+#include <sys/select.h>
 #include <sys/mount.h>
 #include <sys/types.h>
 #include <sys/ioctl.h>
@@ -1879,12 +1880,12 @@ static int tclsystem_vconfig(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Ob
 
 static int tclsystem_tsmf_start_svc(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
 	struct timeval select_timeout;
-	Tcl_WideInt umask_tclval;
-	Tcl_Obj *filename_obj, *env_obj, *logfile_obj, **env_entry_objv, *cwd_obj, *umask_obj, *user_obj, *group_obj, *sri_obj;
+	Tcl_WideInt umask_val, timeout_val;
+	Tcl_Obj *filename_obj, *env_obj, *logfile_obj, **env_entry_objv, *cwd_obj, *umask_obj, *user_obj, *group_obj;
+	Tcl_Obj *sri_obj, *timeout_obj;
 	pid_t child, child_pgid = -1;
 	ssize_t read_ret;
 	time_t currtime;
-	mode_t umask_val;
 	char *argv[3], *envv[512];
 	char *logfile, *filename, *cwd, *user, *group;
 	char logmsg[2048];
@@ -1898,8 +1899,8 @@ static int tclsystem_tsmf_start_svc(ClientData cd, Tcl_Interp *interp, int objc,
 
 	/* 1. Parse arguments */
 	/* 1.a. Ensure the correct number of arguments were passed */
-	if (objc != 9) {
-		Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"::system::syscall::tsmf_start_svc sri filename logfile env cwd umask user group\"", -1));
+	if (objc != 10) {
+		Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"::system::syscall::tsmf_start_svc sri filename logfile env cwd umask user group timeout\"", -1));
 
 		return(TCL_ERROR);
 	}
@@ -1913,6 +1914,7 @@ static int tclsystem_tsmf_start_svc(ClientData cd, Tcl_Interp *interp, int objc,
 	umask_obj = objv[6];
 	user_obj = objv[7];
 	group_obj = objv[8];
+	timeout_obj = objv[9];
 
 	/* 1.c. Store string arguments */
 	filename = Tcl_GetString(filename_obj);
@@ -1922,12 +1924,15 @@ static int tclsystem_tsmf_start_svc(ClientData cd, Tcl_Interp *interp, int objc,
 	group = Tcl_GetString(group_obj);
 
 	/* 1.d. Integer objects */
-	tcl_ret = Tcl_GetWideIntFromObj(interp, umask_obj, &umask_tclval);
+	tcl_ret = Tcl_GetWideIntFromObj(interp, umask_obj, &umask_val);
 	if (tcl_ret != TCL_OK) {
 		return(tcl_ret);
 	}
 
-	umask_val = umask_tclval;
+	tcl_ret = Tcl_GetWideIntFromObj(interp, timeout_obj, &timeout_val);
+	if (tcl_ret != TCL_OK) {
+		return(tcl_ret);
+	}
 
 	/* 1.e. Process environment */
 	tcl_ret = Tcl_ListObjGetElements(interp, env_obj, &env_entry_objc, &env_entry_objv);
@@ -1963,7 +1968,7 @@ static int tclsystem_tsmf_start_svc(ClientData cd, Tcl_Interp *interp, int objc,
 		fd = fds[0];
 
 		/* 4.parent.b. Read process group ID of child from pipe */
-		select_timeout.tv_sec = 30;
+		select_timeout.tv_sec = timeout_val;
 		select_timeout.tv_usec = 0;
 
 		FD_ZERO(&read_fdset);
