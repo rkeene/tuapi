@@ -1955,7 +1955,7 @@ static int tclsystem_tsmf_start_svc(ClientData cd, Tcl_Interp *interp, int objc,
 
 	/* 3. Fork into a new process */
 	child = fork();
-	if (child == ((pid_t) -1)) {
+	if (child == -1) {
 		Tcl_SetObjResult(interp, Tcl_NewStringObj("fork failed", -1));
 
 		return(TCL_ERROR);
@@ -1978,7 +1978,7 @@ static int tclsystem_tsmf_start_svc(ClientData cd, Tcl_Interp *interp, int objc,
 		if (select_ret == 0) {
 			/* On timeout, terminate starting process */
 			child_pgid = getpgid(child);
-			if (child_pgid != ((pid_t) -1)) {
+			if (child_pgid != -1) {
 				kill(-child_pgid, SIGKILL);
 			}
 
@@ -2002,7 +2002,7 @@ static int tclsystem_tsmf_start_svc(ClientData cd, Tcl_Interp *interp, int objc,
 		}
 
 		/* 4.parent.e. If the PGID given is actually an error, return error */
-		if (child_pgid == ((pid_t) -1)) {
+		if (child_pgid == -1) {
 			Tcl_SetObjResult(interp, Tcl_NewStringObj("service failed to start", -1));
 
 			return(TCL_ERROR);
@@ -2020,7 +2020,7 @@ static int tclsystem_tsmf_start_svc(ClientData cd, Tcl_Interp *interp, int objc,
 
 	/* 5. Create a new session */
 	setsid_ret = setsid();
-	if (setsid_ret == ((pid_t) -1)) {
+	if (setsid_ret == -1) {
 		write(fd, &child_pgid, sizeof(child_pgid));
 
 		_exit(0);
@@ -2080,7 +2080,7 @@ static int tclsystem_tsmf_start_svc(ClientData cd, Tcl_Interp *interp, int objc,
 
 	/* 7. Create a new process to actually spawn the process */
 	child = fork();
-	if (child == ((pid_t) -1)) {
+	if (child == -1) {
 		write(fd, &child_pgid, sizeof(child_pgid));
 
 		_exit(0);
@@ -2089,7 +2089,7 @@ static int tclsystem_tsmf_start_svc(ClientData cd, Tcl_Interp *interp, int objc,
 	if (child != 0) {
 		/* 7.parent.a. Wait for child process to terminate and collect status */
 		waitpid_ret = waitpid(child, &status, 0);
-		if (waitpid_ret == ((pid_t) -1)) {
+		if (waitpid_ret == -1) {
 			status = -1;
 		}
 
