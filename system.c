@@ -1890,7 +1890,7 @@ static int tclsystem_tsmf_start_svc(ClientData cd, Tcl_Interp *interp, int objc,
 	char *logfile, *filename, *cwd, *user, *group;
 	char logmsg[2048];
 	fd_set read_fdset;
-	int pipe_ret, setsid_ret, execve_ret, tcl_ret, select_ret;
+	int pipe_ret, setsid_ret, execve_ret, tcl_ret, select_ret, chdir_ret;
 	int null_fd, log_fd, tmp_fd, max_fd;
 	int env_entry_objc;
 	int fds[2], fd;
@@ -2031,7 +2031,12 @@ static int tclsystem_tsmf_start_svc(ClientData cd, Tcl_Interp *interp, int objc,
 	umask(umask_val);
 
 	/* 6.b. Set working directory */
-	chdir(cwd);
+	chdir_ret = chdir(cwd);
+	if (chdir_ret != 0) {
+		write(fd, &child_pgid, sizeof(child_pgid));
+
+		_exit(0);
+	}
 
 	/* 6.c. Open log file for stderr and stdout */
 	log_fd = open(logfile, O_WRONLY | O_CREAT | O_APPEND, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
