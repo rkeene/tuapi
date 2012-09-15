@@ -1883,7 +1883,7 @@ static int tclsystem_tsmf_start_svc(ClientData cd, Tcl_Interp *interp, int objc,
 	Tcl_WideInt umask_val, timeout_val;
 	Tcl_Obj *filename_obj, *env_obj, *logfile_obj, **env_entry_objv, *cwd_obj, *umask_obj, *user_obj, *group_obj;
 	Tcl_Obj *sri_obj, *timeout_obj;
-	pid_t child, child_pgid = -1;
+	pid_t child, child_pgid = -1, waitpid_ret;
 	ssize_t read_ret;
 	time_t currtime;
 	char *argv[3], *envv[512];
@@ -2083,7 +2083,10 @@ static int tclsystem_tsmf_start_svc(ClientData cd, Tcl_Interp *interp, int objc,
 
 	if (child != 0) {
 		/* 7.parent.a. Wait for child process to terminate and collect status */
-		waitpid(child, &status, 0);
+		waitpid_ret = waitpid(child, &status, 0);
+		if (waitpid_ret == ((pid_t) -1)) {
+			status = -1;
+		}
 
 		/* 7.parent.b. Set PGID (if successful, -1 otherwise) to pass back to TSMF */
 		if (status == 0) {
