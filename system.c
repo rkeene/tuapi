@@ -1880,14 +1880,14 @@ static int tclsystem_vconfig(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Ob
 
 static int tclsystem_tsmf_start_svc(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
 	struct timeval select_timeout;
-	Tcl_WideInt umask_val, timeout_val;
-	Tcl_Obj *filename_obj, *env_obj, *logfile_obj, **env_entry_objv, *cwd_obj, *umask_obj, *user_obj, *group_obj;
+	Tcl_WideInt umask_val, timeout_val, uid_val, gid_val;
+	Tcl_Obj *filename_obj, *env_obj, *logfile_obj, **env_entry_objv, *cwd_obj, *umask_obj, *uid_obj, *gid_obj;
 	Tcl_Obj *sri_obj, *timeout_obj;
 	pid_t child, child_pgid = -1, waitpid_ret;
 	ssize_t read_ret;
 	time_t currtime;
 	char *argv[3], *envv[512];
-	char *logfile, *filename, *cwd, *user, *group;
+	char *logfile, *filename, *cwd;
 	char logmsg[2048];
 	fd_set read_fdset;
 	int pipe_ret, setsid_ret, execve_ret, tcl_ret, select_ret, chdir_ret;
@@ -1900,7 +1900,7 @@ static int tclsystem_tsmf_start_svc(ClientData cd, Tcl_Interp *interp, int objc,
 	/* 1. Parse arguments */
 	/* 1.a. Ensure the correct number of arguments were passed */
 	if (objc != 10) {
-		Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"::system::syscall::tsmf_start_svc sri filename logfile env cwd umask user group timeout\"", -1));
+		Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"::system::syscall::tsmf_start_svc sri filename logfile env cwd umask uid gid timeout\"", -1));
 
 		return(TCL_ERROR);
 	}
@@ -1912,16 +1912,14 @@ static int tclsystem_tsmf_start_svc(ClientData cd, Tcl_Interp *interp, int objc,
 	env_obj = objv[4];
 	cwd_obj = objv[5];
 	umask_obj = objv[6];
-	user_obj = objv[7];
-	group_obj = objv[8];
+	uid_obj = objv[7];
+	gid_obj = objv[8];
 	timeout_obj = objv[9];
 
 	/* 1.c. Store string arguments */
 	filename = Tcl_GetString(filename_obj);
 	logfile = Tcl_GetString(logfile_obj);
 	cwd = Tcl_GetString(cwd_obj);
-	user = Tcl_GetString(user_obj);
-	group = Tcl_GetString(group_obj);
 
 	/* 1.d. Integer objects */
 	tcl_ret = Tcl_GetWideIntFromObj(interp, umask_obj, &umask_val);
@@ -1930,6 +1928,16 @@ static int tclsystem_tsmf_start_svc(ClientData cd, Tcl_Interp *interp, int objc,
 	}
 
 	tcl_ret = Tcl_GetWideIntFromObj(interp, timeout_obj, &timeout_val);
+	if (tcl_ret != TCL_OK) {
+		return(tcl_ret);
+	}
+
+	tcl_ret = Tcl_GetWideIntFromObj(interp, uid_obj, &uid_val);
+	if (tcl_ret != TCL_OK) {
+		return(tcl_ret);
+	}
+
+	tcl_ret = Tcl_GetWideIntFromObj(interp, gid_obj, &gid_val);
 	if (tcl_ret != TCL_OK) {
 		return(tcl_ret);
 	}
@@ -2073,10 +2081,10 @@ static int tclsystem_tsmf_start_svc(ClientData cd, Tcl_Interp *interp, int objc,
 
 	/* 6.g. Switch to appropriate user/group */
 	/* 6.g.i. Group */
-	/* XXX: TODO */
+	setgid(gid_val);
 
 	/* 6.g.ii. User */
-	/* XXX: TODO */
+	setuid(uid_val);
 
 	/* 7. Create a new process to actually spawn the process */
 	child = fork();
