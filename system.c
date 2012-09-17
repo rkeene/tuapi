@@ -10,6 +10,7 @@
 #include <sys/swap.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <sys/un.h>
 #include <stdlib.h>
 #include <signal.h>
 #include <unistd.h>
@@ -1878,6 +1879,414 @@ static int tclsystem_vconfig(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Ob
 	return(retval);
 }
 
+#ifndef DISABLE_UNIX_SOCKETS
+struct tclsystem_socket_unix__chan_id {
+	int fd;
+	Tcl_Channel chan;
+};
+
+static int tclsystem_socket_unix__chan_close(ClientData id_p, Tcl_Interp *interp) {
+	struct tclsystem_socket_unix__chan_id *id;
+	int fd;
+
+	id = id_p;
+
+	fd = id->fd;
+
+	close(fd);
+
+	free(id);
+
+	return(TCL_OK);
+}
+
+static int tclsystem_socket_unix__chan_read(ClientData id_p, char *buf, int bufsize, int *errorCodePtr) {
+	struct tclsystem_socket_unix__chan_id *id;
+	ssize_t read_ret;
+	int fd;
+	int retval;
+
+	id = id_p;
+
+	fd = id->fd;
+
+	read_ret = read(fd, buf, bufsize);
+	if (read_ret < 0) {
+		*errorCodePtr = errno;
+
+		return(-1);
+	}
+
+	retval = read_ret;
+
+	return(retval);
+}
+
+static int tclsystem_socket_unix__chan_write(ClientData id_p, const char *buf, int toWrite, int *errorCodePtr) {
+	struct tclsystem_socket_unix__chan_id *id;
+	ssize_t write_ret;
+	int fd;
+	int bytesWritten;
+
+	id = id_p;
+
+	fd = id->fd;
+
+	bytesWritten = 0;
+	while (toWrite) {
+		write_ret = write(fd, buf, toWrite);
+		if (write_ret == 0) {
+			break;
+		}
+
+		if (write_ret < 0) {
+			*errorCodePtr = errno;
+
+			return(-1);
+		}
+
+		toWrite -= write_ret;
+		buf += write_ret;
+		bytesWritten += write_ret;
+	}
+
+	if (bytesWritten == 0) {
+		*errorCodePtr = EAGAIN;
+
+		return(-1);
+	}
+
+	return(bytesWritten);
+}
+
+static void tclsystem_socket_unix__chan_eventhandler(ClientData id_p, int mask) {
+	struct tclsystem_socket_unix__chan_id *id;
+	Tcl_Channel chan;
+
+	id = id_p;
+
+	chan = id->chan;
+
+	if (!chan) {
+		return;
+	}
+
+	Tcl_NotifyChannel(chan, mask);
+}
+
+static void tclsystem_socket_unix__chan_watch(ClientData id_p, int mask) {
+	struct tclsystem_socket_unix__chan_id *id;
+	int fd;
+
+	id = id_p;
+
+	fd = id->fd;
+
+	Tcl_CreateFileHandler(fd, mask, tclsystem_socket_unix__chan_eventhandler, id);
+
+	return;
+}
+
+static int tclsystem_socket_unix__chan_gethandle(ClientData id_p, int direction, ClientData *handlePtr) {
+	struct tclsystem_socket_unix__chan_id *id;
+	int fd;
+	ClientData fd_cd;
+
+	id = id_p;
+
+	fd = id->fd;
+
+	memcpy(&fd_cd, &fd, sizeof(fd));
+
+	*handlePtr = fd_cd;
+
+	return(TCL_OK);
+}
+
+static Tcl_Channel tclsystem_socket_unix_sock2tclchan(int sock) {
+	struct tclsystem_socket_unix__chan_id *id;
+	static Tcl_ChannelType tcl_chan_type;
+	static int tcl_chan_type_init = 0;
+	Tcl_Channel tcl_chan;
+	char chan_name[32];
+	int sock_flags;
+
+	if (!tcl_chan_type_init) {
+		tcl_chan_type.typeName = "socket";
+		tcl_chan_type.version = TCL_CHANNEL_VERSION_2;
+		tcl_chan_type.closeProc = tclsystem_socket_unix__chan_close;
+		tcl_chan_type.inputProc = tclsystem_socket_unix__chan_read;
+		tcl_chan_type.outputProc = tclsystem_socket_unix__chan_write;
+		tcl_chan_type.watchProc = tclsystem_socket_unix__chan_watch;
+		tcl_chan_type.getHandleProc = tclsystem_socket_unix__chan_gethandle;
+		tcl_chan_type.seekProc = NULL;
+		tcl_chan_type.setOptionProc = NULL;
+		tcl_chan_type.getOptionProc = NULL;
+		tcl_chan_type.close2Proc = NULL;
+		tcl_chan_type.blockModeProc = NULL;
+		tcl_chan_type.flushProc = NULL;
+		tcl_chan_type.handlerProc = NULL;
+		tcl_chan_type.wideSeekProc = NULL;
+		tcl_chan_type.threadActionProc = NULL;
+		tcl_chan_type.truncateProc = NULL;
+
+		tcl_chan_type_init = 1;
+	}
+
+	snprintf(chan_name, sizeof(chan_name), "sock%u", sock);
+
+	id = malloc(sizeof(*id));
+	if (id == NULL) {
+		return(NULL);
+	}
+
+	id->fd = sock;
+	id->chan = NULL;
+
+	/* Configure socket as non-blocking */
+	sock_flags = fcntl(sock, F_GETFL, 0);
+	if (sock_flags == -1) {
+		sock_flags = O_NONBLOCK;
+	} else {
+		sock_flags |= O_NONBLOCK;
+	}
+	fcntl(sock, F_SETFL, (long) sock_flags);
+
+	/* Create the channel */
+	tcl_chan = Tcl_CreateChannel(&tcl_chan_type, chan_name, id, TCL_READABLE | TCL_WRITABLE);
+
+	/* Update the structure passed to each function to include the channel name */
+	id->chan = tcl_chan;
+
+	return(tcl_chan);
+}
+
+struct tclsystem_socket_unix__chan_accept_cd {
+	int fd;
+	Tcl_Interp *interp;
+	Tcl_Obj *command;
+};
+
+static void tclsystem_socket_unix__chan_accept(ClientData cd_p, int mask) {
+	struct tclsystem_socket_unix__chan_accept_cd *cd;
+	Tcl_Interp *interp;
+	Tcl_Channel chan;
+	Tcl_Obj *command, *command_to_run_objs[5], *command_to_run;
+	int setsockopt_ret;
+	int pass_creds_true = 1;
+	int fd;
+	int sock;
+
+	if ((mask & TCL_READABLE) != TCL_READABLE) {
+		return;
+	}
+	
+	cd = cd_p;
+
+	fd = cd->fd;
+	interp = cd->interp;
+	command = cd->command;
+
+	sock = accept(fd, NULL, NULL);
+	if (sock < 0) {
+		return;
+	}
+
+	chan = tclsystem_socket_unix_sock2tclchan(sock);
+	if (chan == NULL) {
+		close(sock);
+
+		return;
+	}
+
+	setsockopt_ret = setsockopt(sock, SOL_SOCKET, SO_PASSCRED, &pass_creds_true, sizeof(pass_creds_true));
+	if (setsockopt_ret != 0) {
+		close(sock);
+
+		return;
+	}
+
+	Tcl_RegisterChannel(interp, chan);
+
+	command_to_run_objs[0] = command;
+	command_to_run_objs[1] = Tcl_NewStringObj(Tcl_GetChannelName(chan), -1);
+	command_to_run_objs[2] = Tcl_NewStringObj("...uid...", -1); /* XXX: TODO */
+	command_to_run_objs[3] = Tcl_NewStringObj("...gid...", -1); /* XXX: TODO */
+	command_to_run_objs[4] = Tcl_NewStringObj("...pid...", -1); /* XXX: TODO */
+	command_to_run = Tcl_ConcatObj(sizeof(command_to_run_objs) / sizeof(command_to_run_objs[0]), command_to_run_objs);
+
+	Tcl_EvalObjEx(interp, command_to_run, TCL_EVAL_GLOBAL);
+
+	return;
+}
+
+static int tclsystem_socket_unix_server(ClientData cd, Tcl_Interp *interp, int sock, const char *path, Tcl_Obj *command) {
+	struct tclsystem_socket_unix__chan_accept_cd *accept_cd;
+	struct sockaddr_un dest;
+	ssize_t pathlen;
+	int bind_ret, listen_ret;
+
+	pathlen = strlen(path) + 1;
+	if (pathlen <= 0) {
+		Tcl_SetObjResult(interp, Tcl_NewStringObj("path too short", -1));
+
+		return(TCL_ERROR);
+	}
+
+	if (pathlen > sizeof(dest.sun_path)) {
+		Tcl_SetObjResult(interp, Tcl_NewStringObj("path too long", -1));
+
+		return(TCL_ERROR);
+	}
+
+	dest.sun_family = AF_UNIX;
+	memcpy(dest.sun_path, path, pathlen);
+
+	bind_ret = bind(sock, (struct sockaddr *) &dest, sizeof(dest));
+	if (bind_ret != 0) {
+		Tcl_SetObjResult(interp, Tcl_NewStringObj(strerror(errno), -1));
+
+		return(TCL_ERROR);
+	}
+
+	listen_ret = listen(sock, 2);
+	if (listen_ret != 0) {
+		Tcl_SetObjResult(interp, Tcl_NewStringObj(strerror(errno), -1));
+
+		return(TCL_ERROR);
+	}
+
+	accept_cd = malloc(sizeof(*accept_cd));
+	if (accept_cd == NULL) {
+		Tcl_SetObjResult(interp, Tcl_NewStringObj(strerror(errno), -1));
+
+		return(TCL_ERROR);
+	}
+
+	accept_cd->fd = sock;
+	accept_cd->interp = interp;
+	accept_cd->command = command;
+
+	Tcl_IncrRefCount(command);
+
+	Tcl_CreateFileHandler(sock, TCL_READABLE, tclsystem_socket_unix__chan_accept, accept_cd);
+
+	return(TCL_OK);
+}
+
+static int tclsystem_socket_unix_client(ClientData cd, Tcl_Interp *interp, int sock, const char *path) {
+	Tcl_Channel chan;
+	struct sockaddr_un dest;
+	ssize_t pathlen;
+	int connect_ret, setsockopt_ret;
+	int pass_creds_true = 1;
+
+	pathlen = strlen(path) + 1;
+	if (pathlen <= 0) {
+		Tcl_SetObjResult(interp, Tcl_NewStringObj("path too short", -1));
+
+		return(TCL_ERROR);
+	}
+
+	if (pathlen > sizeof(dest.sun_path)) {
+		Tcl_SetObjResult(interp, Tcl_NewStringObj("path too long", -1));
+
+		return(TCL_ERROR);
+	}
+
+	dest.sun_family = AF_UNIX;
+	memcpy(dest.sun_path, path, pathlen);
+
+	connect_ret = connect(sock, (struct sockaddr *) &dest, sizeof(dest));
+	if (connect_ret != 0) {
+		Tcl_SetObjResult(interp, Tcl_NewStringObj(strerror(errno), -1));
+
+		return(TCL_ERROR);
+	}
+
+	setsockopt_ret = setsockopt(sock, SOL_SOCKET, SO_PASSCRED, &pass_creds_true, sizeof(pass_creds_true));
+	if (setsockopt_ret != 0) {
+		Tcl_SetObjResult(interp, Tcl_NewStringObj(strerror(errno), -1));
+
+		return(TCL_ERROR);
+	}
+
+	chan = tclsystem_socket_unix_sock2tclchan(sock);
+	if (chan == NULL) {
+		Tcl_SetObjResult(interp, Tcl_NewStringObj("unable to create Tcl channel", -1));
+
+		return(TCL_ERROR);
+	}
+
+	Tcl_RegisterChannel(interp, chan);
+
+	Tcl_SetObjResult(interp, Tcl_NewStringObj(Tcl_GetChannelName(chan), -1));
+
+	return(TCL_OK);
+}
+
+static int tclsystem_socket_unix(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
+	Tcl_Obj *path_obj, *command_obj;
+	char *path;
+	int retval;
+	int sock;
+
+	if (objc < 2) {
+		Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"::system::syscall::socket_unix path\" or \"::system::syscall::socket_unix -server command path\"", -1));
+
+		return(TCL_ERROR);
+	}
+
+	path_obj = objv[1];
+	path = Tcl_GetString(path_obj);
+
+	sock = socket(AF_UNIX, SOCK_STREAM, 0);
+	if (sock == -1) {
+		Tcl_SetObjResult(interp, Tcl_NewStringObj(strerror(errno), -1));
+
+		return(TCL_ERROR);
+	}
+
+	if (strcmp(path, "-server") == 0) {
+		if (objc != 4) {
+			Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"::system::syscall::socket_unix -server command path\"", -1));
+
+			close(sock);
+
+			return(TCL_ERROR);
+		}
+
+		command_obj = objv[2];
+		path_obj = objv[3];
+
+		path = Tcl_GetString(path_obj);
+
+		retval = tclsystem_socket_unix_server(cd, interp, sock, path, command_obj);
+	} else {
+		if (objc != 2) {
+			Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"::system::syscall::socket_unix path\"", -1));
+
+			close(sock);
+
+			return(TCL_ERROR);
+		}
+
+		retval = tclsystem_socket_unix_client(cd, interp, sock, path);
+	}
+
+	if (retval != TCL_OK) {
+		close(sock);
+	}
+
+	return(retval);
+}
+#else
+static int tclsystem_socket_unix(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
+	Tcl_SetObjResult(interp, Tcl_NewStringObj("not implemented", -1));
+	return(TCL_ERROR)
+}
+#endif
+
 static int tclsystem_tsmf_start_svc(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
 	struct timeval select_timeout;
 	Tcl_WideInt umask_val, timeout_val, uid_val, gid_val;
@@ -2183,6 +2592,9 @@ int System_Init(Tcl_Interp *interp) {
 	Tcl_CreateObjCommand(interp, "::system::syscall::route", tclsystem_route, NULL, NULL);
 	Tcl_CreateObjCommand(interp, "::system::syscall::brctl", tclsystem_brctl, NULL, NULL);
 	Tcl_CreateObjCommand(interp, "::system::syscall::vconfig", tclsystem_vconfig, NULL, NULL);
+
+	/* Needed commands for basic services Tcl lacks */
+	Tcl_CreateObjCommand(interp, "::system::syscall::socket_unix", tclsystem_socket_unix, NULL, NULL);
 
 	/* Service (TSMF) related commands */
 	Tcl_CreateObjCommand(interp, "::system::syscall::tsmf_start_svc", tclsystem_tsmf_start_svc, NULL, NULL);
