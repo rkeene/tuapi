@@ -1897,7 +1897,7 @@ static int tclsystem_socket_unix__chan_close(ClientData id_p, Tcl_Interp *interp
 
 	free(id);
 
-	return(TCL_OK);
+	return(0);
 }
 
 static int tclsystem_socket_unix__chan_read(ClientData id_p, char *buf, int bufsize, int *errorCodePtr) {
