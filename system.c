@@ -70,7 +70,7 @@ static int pivot_root(const char *new_root, const char *put_old) {
 /*
  * Simple hash routine to enable switching on a string to be implemented
  */
-static unsigned long tclsystem_internal_simplehash(const void *databuf, int datalen) {
+static unsigned long tuapi_internal_simplehash(const void *databuf, int datalen) {
 	unsigned long retval = 0;
 	const unsigned char *data;
 
@@ -86,43 +86,43 @@ static unsigned long tclsystem_internal_simplehash(const void *databuf, int data
 	return(retval);
 }
 
-static unsigned long tclsystem_internal_simplehash_obj(Tcl_Obj *tcl_data) {
+static unsigned long tuapi_internal_simplehash_obj(Tcl_Obj *tcl_data) {
 	unsigned long retval;
 	char *data;
 	int datalen = -1;
 
 	data = Tcl_GetStringFromObj(tcl_data, &datalen);
 
-	retval = tclsystem_internal_simplehash(data, datalen);
+	retval = tuapi_internal_simplehash(data, datalen);
 
 	return(retval);
 }
 
 #if 0
 /* NOTUSED: Uncomment when needed: */
-static unsigned long tclsystem_internal_simplehash_str(const char *data) {
+static unsigned long tuapi_internal_simplehash_str(const char *data) {
 	unsigned long retval;
 	int datalen;
 
 	datalen = strlen(data);
 
-	retval = tclsystem_internal_simplehash(data, datalen);
+	retval = tuapi_internal_simplehash(data, datalen);
 
 	return(retval);
 }
 #endif
 
-static int tclsystem_internalproc_simplehash(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
+static int tuapi_internalproc_simplehash(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
 	unsigned long hashval;
 	Tcl_Obj *hashval_obj;
 
 	if (objc != 2) {
-		Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"::system::internal::hash value\"", -1));
+		Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"::tuapi::internal::hash value\"", -1));
 
 		return(TCL_ERROR);
 	}
 
-	hashval = tclsystem_internal_simplehash_obj(objv[1]);
+	hashval = tuapi_internal_simplehash_obj(objv[1]);
 
 	hashval_obj = Tcl_NewObj();
 	Tcl_SetWideIntObj(hashval_obj, hashval);
@@ -132,7 +132,7 @@ static int tclsystem_internalproc_simplehash(ClientData cd, Tcl_Interp *interp, 
 	return(TCL_OK);
 }
 
-static int tclsystem_internal_getsock(int *sock_v4_out, int *sock_v6_out) {
+static int tuapi_internal_getsock(int *sock_v4_out, int *sock_v6_out) {
 	int sock_v4 = -1, sock_v6 = -1;
 	int sock;
 
@@ -185,7 +185,7 @@ static int tclsystem_internal_getsock(int *sock_v4_out, int *sock_v6_out) {
  * expose to the Tcl-level.  Where possible accept symbolic names rather
  * than numeric values (.e.g, list of values to OR together to get flags).
  */
-static int tclsystem_mount(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
+static int tuapi_mount(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
 	Tcl_Obj *mountflags_obj, **mountflags_list, *mountflag;
 	int mountflags_list_len;
 	char *source, *target, *fstype;
@@ -194,7 +194,7 @@ static int tclsystem_mount(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj 
 	int mount_ret, tcl_ret;
 
 	if (objc < 5 || objc > 6) {
-		Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"::system::syscall::mount source target fstype mountflags ?data?\"", -1));
+		Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"::tuapi::syscall::mount source target fstype mountflags ?data?\"", -1));
 
 		return(TCL_ERROR);
 	}
@@ -216,7 +216,7 @@ static int tclsystem_mount(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj 
 	for (; mountflags_list_len > 0; mountflags_list_len--,mountflags_list++) {
 		mountflag = mountflags_list[0];
 
-		switch (tclsystem_internal_simplehash_obj(mountflag)) {
+		switch (tuapi_internal_simplehash_obj(mountflag)) {
 #ifdef MS_BIND
 			case 0x8526744: /* BIND */
 				mountflags |= MS_BIND;
@@ -312,7 +312,7 @@ static int tclsystem_mount(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj 
 	return(TCL_OK);
 }
 
-static int tclsystem_umount(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
+static int tuapi_umount(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
 	Tcl_Obj **flags, *flag;
 	Tcl_Obj *pathname_obj;
 	char *pathname;
@@ -321,7 +321,7 @@ static int tclsystem_umount(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj
 	int chk_ret, tcl_ret;
 
 	if (objc < 2 || objc > 3) {
-		Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"system::syscall::umount dir ?flags?\"", -1));
+		Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"tuapi::syscall::umount dir ?flags?\"", -1));
 
 		return(TCL_ERROR);
 	}
@@ -341,7 +341,7 @@ static int tclsystem_umount(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj
 		for (; flags_cnt > 0; flags_cnt--,flags++) {
 			flag = flags[0];
 
-			switch (tclsystem_internal_simplehash_obj(flag)) {
+			switch (tuapi_internal_simplehash_obj(flag)) {
 				case 0x69f4a3c5: /* FORCE */
 					umount2_flags |= MNT_FORCE;
 
@@ -382,12 +382,12 @@ static int tclsystem_umount(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj
 	return(TCL_OK);
 }
 
-static int tclsystem_swapon(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
+static int tuapi_swapon(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
 	char *pathname;
 	int chk_ret;
 
 	if (objc != 2) {
-		Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"system::syscall::swapon pathname\"", -1));
+		Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"tuapi::syscall::swapon pathname\"", -1));
 
 		return(TCL_ERROR);
 	}
@@ -404,12 +404,12 @@ static int tclsystem_swapon(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj
 	return(TCL_OK);
 }
 
-static int tclsystem_swapoff(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
+static int tuapi_swapoff(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
 	char *pathname;
 	int chk_ret;
 
 	if (objc != 2) {
-		Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"system::syscall::swapoff pathname\"", -1));
+		Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"tuapi::syscall::swapoff pathname\"", -1));
 
 		return(TCL_ERROR);
 	}
@@ -426,7 +426,7 @@ static int tclsystem_swapoff(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Ob
 	return(TCL_OK);
 }
 
-static int tclsystem_insmod(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
+static int tuapi_insmod(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
 	Tcl_Channel fd;
 	Tcl_Obj *module_filename, *module_data;
 	void *module_data_val;
@@ -434,7 +434,7 @@ static int tclsystem_insmod(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj
 	int read_ret, chk_ret;
 
 	if (objc < 2) {
-		Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"system::syscall::insmod filename ?args ...?\"", -1));
+		Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"tuapi::syscall::insmod filename ?args ...?\"", -1));
 
 		return(TCL_ERROR);
 	}
@@ -477,19 +477,19 @@ static int tclsystem_insmod(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj
 	return(TCL_OK);
 }
 
-static int tclsystem_rmmod(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
+static int tuapi_rmmod(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
 	Tcl_SetObjResult(interp, Tcl_NewStringObj("not implemented", -1));
 
 	return(TCL_ERROR);
 }
 
-static int tclsystem_lsmod(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
+static int tuapi_lsmod(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
 	Tcl_SetObjResult(interp, Tcl_NewStringObj("not implemented", -1));
 
 	return(TCL_ERROR);
 }
 
-static int tclsystem_hostname(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
+static int tuapi_hostname(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
 	char hostname[HOST_NAME_MAX + 1];
 	int chk_ret;
 
@@ -531,18 +531,18 @@ static int tclsystem_hostname(ClientData cd, Tcl_Interp *interp, int objc, Tcl_O
 	return(TCL_ERROR);
 }
 
-static int tclsystem_domainname(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
+static int tuapi_domainname(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
 	Tcl_SetObjResult(interp, Tcl_NewStringObj("not implemented", -1));
 
 	return(TCL_ERROR);
 }
 
-static int tclsystem_chroot(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
+static int tuapi_chroot(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
 	char *pathname;
 	int chk_ret;
 
 	if (objc != 2) {
-		Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"::system::syscall:chroot pathname\"", -1));
+		Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"::tuapi::syscall:chroot pathname\"", -1));
 
 		return(TCL_ERROR);
 	}
@@ -559,12 +559,12 @@ static int tclsystem_chroot(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj
 	return(TCL_OK);
 }
 
-static int tclsystem_pivot_root(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
+static int tuapi_pivot_root(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
 	char *new_root, *put_old;
 	int chk_ret;
 
 	if (objc != 3) {
-		Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"::system::syscall::pivot_root new_root put_old\"", -1));
+		Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"::tuapi::syscall::pivot_root new_root put_old\"", -1));
 
 		return(TCL_ERROR);
 	}
@@ -582,19 +582,19 @@ static int tclsystem_pivot_root(ClientData cd, Tcl_Interp *interp, int objc, Tcl
 	return(TCL_OK);
 }
 
-static int tclsystem_mknod(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
+static int tuapi_mknod(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
 	Tcl_SetObjResult(interp, Tcl_NewStringObj("not implemented", -1));
 
 	return(TCL_ERROR);
 }
 
-static int tclsystem_getuid(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
+static int tuapi_getuid(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
 	Tcl_SetObjResult(interp, Tcl_NewStringObj("not implemented", -1));
 
 	return(TCL_ERROR);
 }
 
-static int tclsystem_kill(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
+static int tuapi_kill(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
 	Tcl_Obj *signal_obj;
 
 	Tcl_WideInt pid_wide, sig_wide;
@@ -603,7 +603,7 @@ static int tclsystem_kill(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *
 	int kill_ret, tcl_ret;
 
 	if (objc != 3) {
-		Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"::system::syscall::kill pid sig\"", -1));
+		Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"::tuapi::syscall::kill pid sig\"", -1));
 
 		return(TCL_ERROR);
 	}
@@ -618,7 +618,7 @@ static int tclsystem_kill(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *
 
 	tcl_ret = Tcl_GetWideIntFromObj(interp, signal_obj, &sig_wide);
 	if (tcl_ret != TCL_OK) {
-		switch (tclsystem_internal_simplehash_obj(signal_obj)) {
+		switch (tuapi_internal_simplehash_obj(signal_obj)) {
 			case 0x122ad0: /* HUP */
 			case 0x98f364d0: /* SIGHUP */
 				sig = SIGHUP;
@@ -766,19 +766,19 @@ static int tclsystem_kill(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *
 	return(TCL_OK);
 }
 
-static int tclsystem_ps(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
+static int tuapi_ps(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
 	Tcl_SetObjResult(interp, Tcl_NewStringObj("not implemented", -1));
 
 	return(TCL_ERROR);
 }
 
-static int tclsystem_execve(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
+static int tuapi_execve(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
 	char **argv = NULL;
 	char *file;
 	int idx;
 
 	if (objc < 2) {
-		Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"::system::syscall::execve file ?args ...?\"", -1));
+		Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"::tuapi::syscall::execve file ?args ...?\"", -1));
 
 		return(TCL_ERROR);
 	}
@@ -803,13 +803,13 @@ static int tclsystem_execve(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj
 	return(TCL_ERROR);
 }
 
-static int tclsystem_losetup(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
+static int tuapi_losetup(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
 	char *file, *loopdev;
 	int chk_ret;
 	int loopfd, filefd;
 
 	if (objc != 3) {
-		Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"::system::syscall::losetup loopdev file\"", -1));
+		Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"::tuapi::syscall::losetup loopdev file\"", -1));
 
 		return(TCL_ERROR);
 	}
@@ -852,7 +852,7 @@ static int tclsystem_losetup(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Ob
 	return(TCL_OK);
 }
 
-static void tclsystem_private_append_sockaddr_to_tclobj(Tcl_Interp *interp, Tcl_Obj *list, char *header, struct sockaddr *addr) {
+static void tuapi_private_append_sockaddr_to_tclobj(Tcl_Interp *interp, Tcl_Obj *list, char *header, struct sockaddr *addr) {
 	char addr_buf[INET6_ADDRSTRLEN + INET_ADDRSTRLEN + 1], *chk_inp;
 
 	switch (addr->sa_family) {
@@ -883,7 +883,7 @@ static void tclsystem_private_append_sockaddr_to_tclobj(Tcl_Interp *interp, Tcl_
 	return;
 }
 
-static int tclsystem_private_get_sockaddr_from_obj(Tcl_Obj *value, void *target) {
+static int tuapi_private_get_sockaddr_from_obj(Tcl_Obj *value, void *target) {
 	struct sockaddr_in local_v4;
 	struct sockaddr_in6 local_v6;
 	const char *addr_str;
@@ -914,7 +914,7 @@ static int tclsystem_private_get_sockaddr_from_obj(Tcl_Obj *value, void *target)
 	return(-1);
 }
 
-static int tclsystem_ifconfig_list(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[], int sock) {
+static int tuapi_ifconfig_list(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[], int sock) {
 	Tcl_Obj *tcl_iface_list;
 	struct ifconf ifaces_cfg;
 	struct ifreq *iface_req = NULL;
@@ -964,7 +964,7 @@ static int tclsystem_ifconfig_list(ClientData cd, Tcl_Interp *interp, int objc, 
 	return(TCL_OK);
 }
 
-static int tclsystem_ifconfig_info(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[], int sock, int sock_v4, int sock_v6) {
+static int tuapi_ifconfig_info(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[], int sock, int sock_v4, int sock_v6) {
 	Tcl_Obj *retlist, *flags;
 	struct ifreq iface_req;
 	unsigned char *addr_data;
@@ -1247,14 +1247,14 @@ static int tclsystem_ifconfig_info(ClientData cd, Tcl_Interp *interp, int objc, 
 	if (sock_v4 != -1) {
 		ioctl_ret = ioctl(sock_v4, SIOCGIFADDR, &iface_req);
 		if (ioctl_ret == 0) {
-			tclsystem_private_append_sockaddr_to_tclobj(interp, retlist, "address", &iface_req.ifr_addr);
+			tuapi_private_append_sockaddr_to_tclobj(interp, retlist, "address", &iface_req.ifr_addr);
 		}
 
 		if (flag_pointopoint) {
 			/* Point-to-Point interfaces */
 			ioctl_ret = ioctl(sock_v4, SIOCGIFDSTADDR, &iface_req);
 			if (ioctl_ret == 0) {
-				tclsystem_private_append_sockaddr_to_tclobj(interp, retlist, "destination", &iface_req.ifr_addr);
+				tuapi_private_append_sockaddr_to_tclobj(interp, retlist, "destination", &iface_req.ifr_addr);
 			}
 		}
 
@@ -1262,13 +1262,13 @@ static int tclsystem_ifconfig_info(ClientData cd, Tcl_Interp *interp, int objc, 
 			/* Broadcast interfaces */
 			ioctl_ret = ioctl(sock_v4, SIOCGIFBRDADDR, &iface_req);
 			if (ioctl_ret == 0) {
-				tclsystem_private_append_sockaddr_to_tclobj(interp, retlist, "broadcast", &iface_req.ifr_addr);
+				tuapi_private_append_sockaddr_to_tclobj(interp, retlist, "broadcast", &iface_req.ifr_addr);
 			}
 		}
 
 		ioctl_ret = ioctl(sock_v4, SIOCGIFNETMASK, &iface_req);
 		if (ioctl_ret == 0) {
-			tclsystem_private_append_sockaddr_to_tclobj(interp, retlist, "netmask", &iface_req.ifr_addr);
+			tuapi_private_append_sockaddr_to_tclobj(interp, retlist, "netmask", &iface_req.ifr_addr);
 		}
 	}
 
@@ -1277,7 +1277,7 @@ static int tclsystem_ifconfig_info(ClientData cd, Tcl_Interp *interp, int objc, 
 	return(TCL_OK);
 }
 
-static int tclsystem_ifconfig_conf(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[], int sock, int sock_v4, int sock_v6) {
+static int tuapi_ifconfig_conf(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[], int sock, int sock_v4, int sock_v6) {
 	Tcl_Obj *option_name_obj, *option_val_obj;
 	Tcl_Obj **flags_objv;
 	struct ifreq iface_req;
@@ -1317,7 +1317,7 @@ static int tclsystem_ifconfig_conf(ClientData cd, Tcl_Interp *interp, int objc, 
 
 		option_val_obj = objv[0];
 
-		switch (tclsystem_internal_simplehash_obj(option_name_obj)) {
+		switch (tuapi_internal_simplehash_obj(option_name_obj)) {
 			case 0x6d9870f3: /* flags */
 				flags = 0;
 
@@ -1327,7 +1327,7 @@ static int tclsystem_ifconfig_conf(ClientData cd, Tcl_Interp *interp, int objc, 
 				}
 
 				for (; flags_objc > 0; flags_objc--,flags_objv++) {
-					switch (tclsystem_internal_simplehash_obj(flags_objv[0])) {
+					switch (tuapi_internal_simplehash_obj(flags_objv[0])) {
 						case 0x2ad0: /* UP */
 							flags |= IFF_UP;
 							break;
@@ -1431,7 +1431,7 @@ static int tclsystem_ifconfig_conf(ClientData cd, Tcl_Interp *interp, int objc, 
 					tmp_ioctl_addr = &iface_req.ifr_netmask;
 				}
 
-				parse_ret = tclsystem_private_get_sockaddr_from_obj(option_val_obj, tmp_ioctl_addr);
+				parse_ret = tuapi_private_get_sockaddr_from_obj(option_val_obj, tmp_ioctl_addr);
 				if (parse_ret != 0) {
 					Tcl_SetObjResult(interp, Tcl_ObjPrintf("unable to parse \"%s\" as an address", Tcl_GetString(option_val_obj)));
 
@@ -1470,11 +1470,11 @@ static int tclsystem_ifconfig_conf(ClientData cd, Tcl_Interp *interp, int objc, 
 	return(TCL_OK);
 }
 
-static int tclsystem_ifconfig(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
+static int tuapi_ifconfig(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
 	int sock_v4, sock_v6, sock;
 	int retval = TCL_ERROR;
 
-	sock = tclsystem_internal_getsock(&sock_v4, &sock_v6);
+	sock = tuapi_internal_getsock(&sock_v4, &sock_v6);
 	if (sock == -1) {
 		Tcl_SetObjResult(interp, Tcl_NewStringObj("unable to create socket", -1));
 
@@ -1484,16 +1484,16 @@ static int tclsystem_ifconfig(ClientData cd, Tcl_Interp *interp, int objc, Tcl_O
 	switch (objc) {
 		case 0:
 		case 1: /* No arguments, list all interfaces */
-			retval = tclsystem_ifconfig_list(cd, interp, objc, objv, sock);
+			retval = tuapi_ifconfig_list(cd, interp, objc, objv, sock);
 
 			break;
 		case 2: /* One argument, give information about the interface */
-			retval = tclsystem_ifconfig_info(cd, interp, objc, objv, sock, sock_v4, sock_v6);
+			retval = tuapi_ifconfig_info(cd, interp, objc, objv, sock, sock_v4, sock_v6);
 
 			break;
 		default:
 			/* Otherwise, configure the interace */
-			retval = tclsystem_ifconfig_conf(cd, interp, objc, objv, sock, sock_v4, sock_v6);
+			retval = tuapi_ifconfig_conf(cd, interp, objc, objv, sock, sock_v4, sock_v6);
 
 			break;
 	}
@@ -1510,13 +1510,13 @@ static int tclsystem_ifconfig(ClientData cd, Tcl_Interp *interp, int objc, Tcl_O
 	return(retval);
 }
 
-static int tclsystem_route_list(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[], int sock_v4, int sock_v6) {
+static int tuapi_route_list(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[], int sock_v4, int sock_v6) {
 	Tcl_SetObjResult(interp, Tcl_NewStringObj("not implemented", -1));
 
 	return(TCL_ERROR);
 }
 
-static int tclsystem_route_conf(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[], int sock_v4, int sock_v6) {
+static int tuapi_route_conf(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[], int sock_v4, int sock_v6) {
 	Tcl_WideInt option_val_wide; 
 	Tcl_Obj *operation_obj, *dest_obj, *destmask_obj;
 	Tcl_Obj *option_name_obj, *option_val_obj;
@@ -1526,7 +1526,7 @@ static int tclsystem_route_conf(ClientData cd, Tcl_Interp *interp, int objc, Tcl
 	int tcl_ret, ioctl_ret, parse_ret;
 
 	if (objc < 4) {
-		Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"::system::syscall::route operation destination destination_mask ?options?\"", -1));
+		Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"::tuapi::syscall::route operation destination destination_mask ?options?\"", -1));
 
 		return(TCL_ERROR);
 	}
@@ -1536,7 +1536,7 @@ static int tclsystem_route_conf(ClientData cd, Tcl_Interp *interp, int objc, Tcl
 
 	/* Determine operation */
 	operation_obj = objv[1];
-	switch (tclsystem_internal_simplehash_obj(operation_obj)) {
+	switch (tuapi_internal_simplehash_obj(operation_obj)) {
 		case 0x187264: /* add */
 			ioctl_id = SIOCADDRT;
 			break;
@@ -1555,7 +1555,7 @@ static int tclsystem_route_conf(ClientData cd, Tcl_Interp *interp, int objc, Tcl
 
 	/* Parse destination address */
 	dest_obj = objv[2];
-	parse_ret = tclsystem_private_get_sockaddr_from_obj(dest_obj, &route.rt_dst);
+	parse_ret = tuapi_private_get_sockaddr_from_obj(dest_obj, &route.rt_dst);
 	if (parse_ret != 0) {
 		Tcl_SetObjResult(interp, Tcl_ObjPrintf("unable to parse \"%s\" as an address", Tcl_GetString(dest_obj)));
 
@@ -1564,7 +1564,7 @@ static int tclsystem_route_conf(ClientData cd, Tcl_Interp *interp, int objc, Tcl
 
 	/* Parse destination netmask */
 	destmask_obj = objv[3];
-	parse_ret = tclsystem_private_get_sockaddr_from_obj(destmask_obj, &route.rt_genmask);
+	parse_ret = tuapi_private_get_sockaddr_from_obj(destmask_obj, &route.rt_genmask);
 	if (parse_ret != 0) {
 		Tcl_SetObjResult(interp, Tcl_ObjPrintf("unable to parse \"%s\" as an address", Tcl_GetString(destmask_obj)));
 
@@ -1631,9 +1631,9 @@ static int tclsystem_route_conf(ClientData cd, Tcl_Interp *interp, int objc, Tcl
 
 		option_val_obj = objv[0];
 
-		switch (tclsystem_internal_simplehash_obj(option_name_obj)) {
+		switch (tuapi_internal_simplehash_obj(option_name_obj)) {
 			case 0x4c727779: /* gateway */
-				parse_ret = tclsystem_private_get_sockaddr_from_obj(option_val_obj, &route.rt_gateway);
+				parse_ret = tuapi_private_get_sockaddr_from_obj(option_val_obj, &route.rt_gateway);
 				if (parse_ret != 0) {
 					Tcl_SetObjResult(interp, Tcl_ObjPrintf("unable to parse \"%s\" as an address", Tcl_GetString(option_val_obj)));
 
@@ -1696,11 +1696,11 @@ static int tclsystem_route_conf(ClientData cd, Tcl_Interp *interp, int objc, Tcl
 	return(TCL_OK);
 }
 
-static int tclsystem_route(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
+static int tuapi_route(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
 	int sock_v4, sock_v6, sock;
 	int retval = TCL_ERROR;
 
-	sock = tclsystem_internal_getsock(&sock_v4, &sock_v6);
+	sock = tuapi_internal_getsock(&sock_v4, &sock_v6);
 	if (sock == -1) {
 		Tcl_SetObjResult(interp, Tcl_NewStringObj("unable to create socket", -1));
 
@@ -1710,12 +1710,12 @@ static int tclsystem_route(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj 
 	switch (objc) {
 		case 0:
 		case 1: /* No arguments, list all interfaces */
-			retval = tclsystem_route_list(cd, interp, objc, objv, sock_v4, sock_v6);
+			retval = tuapi_route_list(cd, interp, objc, objv, sock_v4, sock_v6);
 
 			break;
 		default:
 			/* Otherwise, modify routes */
-			retval = tclsystem_route_conf(cd, interp, objc, objv, sock_v4, sock_v6);
+			retval = tuapi_route_conf(cd, interp, objc, objv, sock_v4, sock_v6);
 
 			break;
 	}
@@ -1732,13 +1732,13 @@ static int tclsystem_route(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj 
 	return(retval);
 }
 
-static int tclsystem_brctl_list(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[], int sock) {
+static int tuapi_brctl_list(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[], int sock) {
 	Tcl_SetObjResult(interp, Tcl_NewStringObj("not implemented", -1));
 
 	return(TCL_ERROR);
 }
 
-static int tclsystem_brctl_conf(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[], int sock) {
+static int tuapi_brctl_conf(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[], int sock) {
 	Tcl_Obj *operation_obj, *bridge_name_obj, *interface_name_obj;
 	unsigned long arg[4];
 	struct ifreq ifr;
@@ -1747,15 +1747,15 @@ static int tclsystem_brctl_conf(ClientData cd, Tcl_Interp *interp, int objc, Tcl
 
 	/* Determine operation */
 	operation_obj = objv[1];
-	switch (tclsystem_internal_simplehash_obj(operation_obj)) {
+	switch (tuapi_internal_simplehash_obj(operation_obj)) {
 		case 0x1c993272: /* addbr */
 			add = 1;
 		case 0x4cbb3272: /* delbr */
 			if (objc != 3) {
 				if (add) {
-					Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"::system::syscall::brctl addbr bridge\"", -1));
+					Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"::tuapi::syscall::brctl addbr bridge\"", -1));
 				} else {
-					Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"::system::syscall::brctl delbr bridge\"", -1));
+					Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"::tuapi::syscall::brctl delbr bridge\"", -1));
 				}
 
 				return(TCL_ERROR);
@@ -1780,9 +1780,9 @@ static int tclsystem_brctl_conf(ClientData cd, Tcl_Interp *interp, int objc, Tcl
 		case 0x4cbb37e6: /* delif */
 			if (objc != 4) {
 				if (add) {
-					Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"::system::syscall::brctl addif bridge interface\"", -1));
+					Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"::tuapi::syscall::brctl addif bridge interface\"", -1));
 				} else {
-					Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"::system::syscall::brctl delif bridge interface\"", -1));
+					Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"::tuapi::syscall::brctl delif bridge interface\"", -1));
 				}
 
 				return(TCL_ERROR);
@@ -1818,11 +1818,11 @@ static int tclsystem_brctl_conf(ClientData cd, Tcl_Interp *interp, int objc, Tcl
 	return(TCL_OK);
 }
 
-static int tclsystem_brctl(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
+static int tuapi_brctl(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
 	int sock_v4, sock_v6, sock;
 	int retval = TCL_ERROR;
 
-	sock = tclsystem_internal_getsock(&sock_v4, &sock_v6);
+	sock = tuapi_internal_getsock(&sock_v4, &sock_v6);
 	if (sock == -1) {
 		Tcl_SetObjResult(interp, Tcl_NewStringObj("unable to create socket", -1));
 
@@ -1832,12 +1832,12 @@ static int tclsystem_brctl(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj 
 	switch (objc) {
 		case 0:
 		case 1: /* No arguments, list all bridges */
-			retval = tclsystem_brctl_list(cd, interp, objc, objv, sock);
+			retval = tuapi_brctl_list(cd, interp, objc, objv, sock);
 
 			break;
 		default:
 			/* Otherwise, modify routes */
-			retval = tclsystem_brctl_conf(cd, interp, objc, objv, sock);
+			retval = tuapi_brctl_conf(cd, interp, objc, objv, sock);
 
 			break;
 	}
@@ -1854,11 +1854,11 @@ static int tclsystem_brctl(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj 
 	return(retval);
 }
 
-static int tclsystem_vconfig(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
+static int tuapi_vconfig(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
 	int sock_v4, sock_v6, sock;
 	int retval = TCL_ERROR;
 
-	sock = tclsystem_internal_getsock(&sock_v4, &sock_v6);
+	sock = tuapi_internal_getsock(&sock_v4, &sock_v6);
 	if (sock == -1) {
 		Tcl_SetObjResult(interp, Tcl_NewStringObj("unable to create socket", -1));
 
@@ -1880,13 +1880,13 @@ static int tclsystem_vconfig(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Ob
 }
 
 #ifndef DISABLE_UNIX_SOCKETS
-struct tclsystem_socket_unix__chan_id {
+struct tuapi_socket_unix__chan_id {
 	int fd;
 	Tcl_Channel chan;
 };
 
-static int tclsystem_socket_unix__chan_close(ClientData id_p, Tcl_Interp *interp) {
-	struct tclsystem_socket_unix__chan_id *id;
+static int tuapi_socket_unix__chan_close(ClientData id_p, Tcl_Interp *interp) {
+	struct tuapi_socket_unix__chan_id *id;
 	int fd;
 
 	id = id_p;
@@ -1900,8 +1900,8 @@ static int tclsystem_socket_unix__chan_close(ClientData id_p, Tcl_Interp *interp
 	return(0);
 }
 
-static int tclsystem_socket_unix__chan_read(ClientData id_p, char *buf, int bufsize, int *errorCodePtr) {
-	struct tclsystem_socket_unix__chan_id *id;
+static int tuapi_socket_unix__chan_read(ClientData id_p, char *buf, int bufsize, int *errorCodePtr) {
+	struct tuapi_socket_unix__chan_id *id;
 	ssize_t read_ret;
 	int fd;
 	int retval;
@@ -1922,8 +1922,8 @@ static int tclsystem_socket_unix__chan_read(ClientData id_p, char *buf, int bufs
 	return(retval);
 }
 
-static int tclsystem_socket_unix__chan_write(ClientData id_p, const char *buf, int toWrite, int *errorCodePtr) {
-	struct tclsystem_socket_unix__chan_id *id;
+static int tuapi_socket_unix__chan_write(ClientData id_p, const char *buf, int toWrite, int *errorCodePtr) {
+	struct tuapi_socket_unix__chan_id *id;
 	ssize_t write_ret;
 	int fd;
 	int bytesWritten;
@@ -1959,8 +1959,8 @@ static int tclsystem_socket_unix__chan_write(ClientData id_p, const char *buf, i
 	return(bytesWritten);
 }
 
-static void tclsystem_socket_unix__chan_eventhandler(ClientData id_p, int mask) {
-	struct tclsystem_socket_unix__chan_id *id;
+static void tuapi_socket_unix__chan_eventhandler(ClientData id_p, int mask) {
+	struct tuapi_socket_unix__chan_id *id;
 	Tcl_Channel chan;
 
 	id = id_p;
@@ -1974,21 +1974,21 @@ static void tclsystem_socket_unix__chan_eventhandler(ClientData id_p, int mask) 
 	Tcl_NotifyChannel(chan, mask);
 }
 
-static void tclsystem_socket_unix__chan_watch(ClientData id_p, int mask) {
-	struct tclsystem_socket_unix__chan_id *id;
+static void tuapi_socket_unix__chan_watch(ClientData id_p, int mask) {
+	struct tuapi_socket_unix__chan_id *id;
 	int fd;
 
 	id = id_p;
 
 	fd = id->fd;
 
-	Tcl_CreateFileHandler(fd, mask, tclsystem_socket_unix__chan_eventhandler, id);
+	Tcl_CreateFileHandler(fd, mask, tuapi_socket_unix__chan_eventhandler, id);
 
 	return;
 }
 
-static int tclsystem_socket_unix__chan_gethandle(ClientData id_p, int direction, ClientData *handlePtr) {
-	struct tclsystem_socket_unix__chan_id *id;
+static int tuapi_socket_unix__chan_gethandle(ClientData id_p, int direction, ClientData *handlePtr) {
+	struct tuapi_socket_unix__chan_id *id;
 	int fd;
 	ClientData fd_cd;
 
@@ -2003,8 +2003,8 @@ static int tclsystem_socket_unix__chan_gethandle(ClientData id_p, int direction,
 	return(TCL_OK);
 }
 
-static Tcl_Channel tclsystem_socket_unix_sock2tclchan(int sock) {
-	struct tclsystem_socket_unix__chan_id *id;
+static Tcl_Channel tuapi_socket_unix_sock2tclchan(int sock) {
+	struct tuapi_socket_unix__chan_id *id;
 	static Tcl_ChannelType tcl_chan_type;
 	static int tcl_chan_type_init = 0;
 	Tcl_Channel tcl_chan;
@@ -2014,11 +2014,11 @@ static Tcl_Channel tclsystem_socket_unix_sock2tclchan(int sock) {
 	if (!tcl_chan_type_init) {
 		tcl_chan_type.typeName = "socket";
 		tcl_chan_type.version = TCL_CHANNEL_VERSION_2;
-		tcl_chan_type.closeProc = tclsystem_socket_unix__chan_close;
-		tcl_chan_type.inputProc = tclsystem_socket_unix__chan_read;
-		tcl_chan_type.outputProc = tclsystem_socket_unix__chan_write;
-		tcl_chan_type.watchProc = tclsystem_socket_unix__chan_watch;
-		tcl_chan_type.getHandleProc = tclsystem_socket_unix__chan_gethandle;
+		tcl_chan_type.closeProc = tuapi_socket_unix__chan_close;
+		tcl_chan_type.inputProc = tuapi_socket_unix__chan_read;
+		tcl_chan_type.outputProc = tuapi_socket_unix__chan_write;
+		tcl_chan_type.watchProc = tuapi_socket_unix__chan_watch;
+		tcl_chan_type.getHandleProc = tuapi_socket_unix__chan_gethandle;
 		tcl_chan_type.seekProc = NULL;
 		tcl_chan_type.setOptionProc = NULL;
 		tcl_chan_type.getOptionProc = NULL;
@@ -2061,14 +2061,14 @@ static Tcl_Channel tclsystem_socket_unix_sock2tclchan(int sock) {
 	return(tcl_chan);
 }
 
-struct tclsystem_socket_unix__chan_accept_cd {
+struct tuapi_socket_unix__chan_accept_cd {
 	int fd;
 	Tcl_Interp *interp;
 	Tcl_Obj *command;
 };
 
-static void tclsystem_socket_unix__chan_accept(ClientData cd_p, int mask) {
-	struct tclsystem_socket_unix__chan_accept_cd *cd;
+static void tuapi_socket_unix__chan_accept(ClientData cd_p, int mask) {
+	struct tuapi_socket_unix__chan_accept_cd *cd;
 	Tcl_Interp *interp;
 	Tcl_Channel chan;
 	Tcl_Obj *command, *command_to_run_objs[5], *command_to_run;
@@ -2092,7 +2092,7 @@ static void tclsystem_socket_unix__chan_accept(ClientData cd_p, int mask) {
 		return;
 	}
 
-	chan = tclsystem_socket_unix_sock2tclchan(sock);
+	chan = tuapi_socket_unix_sock2tclchan(sock);
 	if (chan == NULL) {
 		close(sock);
 
@@ -2120,8 +2120,8 @@ static void tclsystem_socket_unix__chan_accept(ClientData cd_p, int mask) {
 	return;
 }
 
-static int tclsystem_socket_unix_server(ClientData cd, Tcl_Interp *interp, int sock, const char *path, Tcl_Obj *command) {
-	struct tclsystem_socket_unix__chan_accept_cd *accept_cd;
+static int tuapi_socket_unix_server(ClientData cd, Tcl_Interp *interp, int sock, const char *path, Tcl_Obj *command) {
+	struct tuapi_socket_unix__chan_accept_cd *accept_cd;
 	struct sockaddr_un dest;
 	ssize_t pathlen;
 	int bind_ret, listen_ret;
@@ -2169,12 +2169,12 @@ static int tclsystem_socket_unix_server(ClientData cd, Tcl_Interp *interp, int s
 
 	Tcl_IncrRefCount(command);
 
-	Tcl_CreateFileHandler(sock, TCL_READABLE, tclsystem_socket_unix__chan_accept, accept_cd);
+	Tcl_CreateFileHandler(sock, TCL_READABLE, tuapi_socket_unix__chan_accept, accept_cd);
 
 	return(TCL_OK);
 }
 
-static int tclsystem_socket_unix_client(ClientData cd, Tcl_Interp *interp, int sock, const char *path) {
+static int tuapi_socket_unix_client(ClientData cd, Tcl_Interp *interp, int sock, const char *path) {
 	Tcl_Channel chan;
 	struct sockaddr_un dest;
 	ssize_t pathlen;
@@ -2211,7 +2211,7 @@ static int tclsystem_socket_unix_client(ClientData cd, Tcl_Interp *interp, int s
 		return(TCL_ERROR);
 	}
 
-	chan = tclsystem_socket_unix_sock2tclchan(sock);
+	chan = tuapi_socket_unix_sock2tclchan(sock);
 	if (chan == NULL) {
 		Tcl_SetObjResult(interp, Tcl_NewStringObj("unable to create Tcl channel", -1));
 
@@ -2225,14 +2225,14 @@ static int tclsystem_socket_unix_client(ClientData cd, Tcl_Interp *interp, int s
 	return(TCL_OK);
 }
 
-static int tclsystem_socket_unix(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
+static int tuapi_socket_unix(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
 	Tcl_Obj *path_obj, *command_obj;
 	char *path;
 	int retval;
 	int sock;
 
 	if (objc < 2) {
-		Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"::system::syscall::socket_unix path\" or \"::system::syscall::socket_unix -server command path\"", -1));
+		Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"::tuapi::syscall::socket_unix path\" or \"::tuapi::syscall::socket_unix -server command path\"", -1));
 
 		return(TCL_ERROR);
 	}
@@ -2249,7 +2249,7 @@ static int tclsystem_socket_unix(ClientData cd, Tcl_Interp *interp, int objc, Tc
 
 	if (strcmp(path, "-server") == 0) {
 		if (objc != 4) {
-			Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"::system::syscall::socket_unix -server command path\"", -1));
+			Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"::tuapi::syscall::socket_unix -server command path\"", -1));
 
 			close(sock);
 
@@ -2261,17 +2261,17 @@ static int tclsystem_socket_unix(ClientData cd, Tcl_Interp *interp, int objc, Tc
 
 		path = Tcl_GetString(path_obj);
 
-		retval = tclsystem_socket_unix_server(cd, interp, sock, path, command_obj);
+		retval = tuapi_socket_unix_server(cd, interp, sock, path, command_obj);
 	} else {
 		if (objc != 2) {
-			Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"::system::syscall::socket_unix path\"", -1));
+			Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"::tuapi::syscall::socket_unix path\"", -1));
 
 			close(sock);
 
 			return(TCL_ERROR);
 		}
 
-		retval = tclsystem_socket_unix_client(cd, interp, sock, path);
+		retval = tuapi_socket_unix_client(cd, interp, sock, path);
 	}
 
 	if (retval != TCL_OK) {
@@ -2281,13 +2281,13 @@ static int tclsystem_socket_unix(ClientData cd, Tcl_Interp *interp, int objc, Tc
 	return(retval);
 }
 #else
-static int tclsystem_socket_unix(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
+static int tuapi_socket_unix(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
 	Tcl_SetObjResult(interp, Tcl_NewStringObj("not implemented", -1));
 	return(TCL_ERROR)
 }
 #endif
 
-static int tclsystem_tsmf_start_svc(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
+static int tuapi_tsmf_start_svc(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
 	struct timeval select_timeout;
 	Tcl_WideInt umask_val, timeout_val, uid_val, gid_val;
 	Tcl_Obj *filename_obj, *env_obj, *logfile_obj, **env_entry_objv, *cwd_obj, *umask_obj, *uid_obj, *gid_obj;
@@ -2309,7 +2309,7 @@ static int tclsystem_tsmf_start_svc(ClientData cd, Tcl_Interp *interp, int objc,
 	/* 1. Parse arguments */
 	/* 1.a. Ensure the correct number of arguments were passed */
 	if (objc != 10) {
-		Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"::system::syscall::tsmf_start_svc sri filename logfile env cwd umask uid gid timeout\"", -1));
+		Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"::tuapi::syscall::tsmf_start_svc sri filename logfile env cwd umask uid gid timeout\"", -1));
 
 		return(TCL_ERROR);
 	}
@@ -2549,9 +2549,13 @@ static int tclsystem_tsmf_start_svc(ClientData cd, Tcl_Interp *interp, int objc,
 
 	/* 10. Abort if something has gone wrong */
 	_exit(execve_ret);
+
+	/* Handle lint-ness */
+	return(TCL_ERROR);
+	sri_obj = sri_obj;
 }
 
-int System_Init(Tcl_Interp *interp) {
+int Tuapi_Init(Tcl_Interp *interp) {
 #ifdef USE_TCL_STUBS
 	const char *tclInitStubs_ret;
 
@@ -2563,58 +2567,58 @@ int System_Init(Tcl_Interp *interp) {
 #endif
 
 	/* Kernel maintenance related commands */
-	Tcl_CreateObjCommand(interp, "::system::syscall::insmod", tclsystem_insmod, NULL, NULL);
-	Tcl_CreateObjCommand(interp, "::system::syscall::rmmod", tclsystem_rmmod, NULL, NULL);
-	Tcl_CreateObjCommand(interp, "::system::syscall::lsmod", tclsystem_lsmod, NULL, NULL);
-	Tcl_CreateObjCommand(interp, "::system::syscall::hostname", tclsystem_hostname, NULL, NULL);
-	Tcl_CreateObjCommand(interp, "::system::syscall::domainname", tclsystem_domainname, NULL, NULL);
+	Tcl_CreateObjCommand(interp, "::tuapi::syscall::insmod", tuapi_insmod, NULL, NULL);
+	Tcl_CreateObjCommand(interp, "::tuapi::syscall::rmmod", tuapi_rmmod, NULL, NULL);
+	Tcl_CreateObjCommand(interp, "::tuapi::syscall::lsmod", tuapi_lsmod, NULL, NULL);
+	Tcl_CreateObjCommand(interp, "::tuapi::syscall::hostname", tuapi_hostname, NULL, NULL);
+	Tcl_CreateObjCommand(interp, "::tuapi::syscall::domainname", tuapi_domainname, NULL, NULL);
 
 	/* Block or char device related commands */
-	Tcl_CreateObjCommand(interp, "::system::syscall::losetup", tclsystem_losetup, NULL, NULL);
+	Tcl_CreateObjCommand(interp, "::tuapi::syscall::losetup", tuapi_losetup, NULL, NULL);
 
 	/* Filesystem related commands */
-	Tcl_CreateObjCommand(interp, "::system::syscall::mount", tclsystem_mount, NULL, NULL);
-	Tcl_CreateObjCommand(interp, "::system::syscall::umount", tclsystem_umount, NULL, NULL);
-	Tcl_CreateObjCommand(interp, "::system::syscall::swapon", tclsystem_swapon, NULL, NULL);
-	Tcl_CreateObjCommand(interp, "::system::syscall::swapoff", tclsystem_swapoff, NULL, NULL);
-	Tcl_CreateObjCommand(interp, "::system::syscall::mknod", tclsystem_mknod, NULL, NULL);
+	Tcl_CreateObjCommand(interp, "::tuapi::syscall::mount", tuapi_mount, NULL, NULL);
+	Tcl_CreateObjCommand(interp, "::tuapi::syscall::umount", tuapi_umount, NULL, NULL);
+	Tcl_CreateObjCommand(interp, "::tuapi::syscall::swapon", tuapi_swapon, NULL, NULL);
+	Tcl_CreateObjCommand(interp, "::tuapi::syscall::swapoff", tuapi_swapoff, NULL, NULL);
+	Tcl_CreateObjCommand(interp, "::tuapi::syscall::mknod", tuapi_mknod, NULL, NULL);
 
 	/* Process related commands */
-	Tcl_CreateObjCommand(interp, "::system::syscall::getuid", tclsystem_getuid, NULL, NULL);
-	Tcl_CreateObjCommand(interp, "::system::syscall::chroot", tclsystem_chroot, NULL, NULL);
-	Tcl_CreateObjCommand(interp, "::system::syscall::pivot_root", tclsystem_pivot_root, NULL, NULL);
-	Tcl_CreateObjCommand(interp, "::system::syscall::kill", tclsystem_kill, NULL, NULL);
-	Tcl_CreateObjCommand(interp, "::system::syscall::ps", tclsystem_ps, NULL, NULL);
-	Tcl_CreateObjCommand(interp, "::system::syscall::execve", tclsystem_execve, NULL, NULL);
+	Tcl_CreateObjCommand(interp, "::tuapi::syscall::getuid", tuapi_getuid, NULL, NULL);
+	Tcl_CreateObjCommand(interp, "::tuapi::syscall::chroot", tuapi_chroot, NULL, NULL);
+	Tcl_CreateObjCommand(interp, "::tuapi::syscall::pivot_root", tuapi_pivot_root, NULL, NULL);
+	Tcl_CreateObjCommand(interp, "::tuapi::syscall::kill", tuapi_kill, NULL, NULL);
+	Tcl_CreateObjCommand(interp, "::tuapi::syscall::ps", tuapi_ps, NULL, NULL);
+	Tcl_CreateObjCommand(interp, "::tuapi::syscall::execve", tuapi_execve, NULL, NULL);
 
 	/* Network related commands */
-	Tcl_CreateObjCommand(interp, "::system::syscall::ifconfig", tclsystem_ifconfig, NULL, NULL);
-	Tcl_CreateObjCommand(interp, "::system::syscall::route", tclsystem_route, NULL, NULL);
-	Tcl_CreateObjCommand(interp, "::system::syscall::brctl", tclsystem_brctl, NULL, NULL);
-	Tcl_CreateObjCommand(interp, "::system::syscall::vconfig", tclsystem_vconfig, NULL, NULL);
+	Tcl_CreateObjCommand(interp, "::tuapi::syscall::ifconfig", tuapi_ifconfig, NULL, NULL);
+	Tcl_CreateObjCommand(interp, "::tuapi::syscall::route", tuapi_route, NULL, NULL);
+	Tcl_CreateObjCommand(interp, "::tuapi::syscall::brctl", tuapi_brctl, NULL, NULL);
+	Tcl_CreateObjCommand(interp, "::tuapi::syscall::vconfig", tuapi_vconfig, NULL, NULL);
 
 	/* Needed commands for basic services Tcl lacks */
-	Tcl_CreateObjCommand(interp, "::system::syscall::socket_unix", tclsystem_socket_unix, NULL, NULL);
+	Tcl_CreateObjCommand(interp, "::tuapi::syscall::socket_unix", tuapi_socket_unix, NULL, NULL);
 
 	/* Service (TSMF) related commands */
-	Tcl_CreateObjCommand(interp, "::system::syscall::tsmf_start_svc", tclsystem_tsmf_start_svc, NULL, NULL);
+	Tcl_CreateObjCommand(interp, "::tuapi::syscall::tsmf_start_svc", tuapi_tsmf_start_svc, NULL, NULL);
 
 	/* Internal functions */
-	Tcl_CreateObjCommand(interp, "::system::internal::hash", tclsystem_internalproc_simplehash, NULL, NULL);
+	Tcl_CreateObjCommand(interp, "::tuapi::internal::hash", tuapi_internalproc_simplehash, NULL, NULL);
 
 	/* Define constants */
 	/** Create parent namespace **/
-	Tcl_CreateNamespace(interp, "::system::const", NULL, NULL);
+	Tcl_CreateNamespace(interp, "::tuapi::const", NULL, NULL);
 
 	/** Define constants, for real **/
-	Tcl_ObjSetVar2(interp, Tcl_NewStringObj("::system::const::HOST_NAME_MAX", -1), NULL, Tcl_NewWideIntObj(HOST_NAME_MAX), TCL_GLOBAL_ONLY);
+	Tcl_ObjSetVar2(interp, Tcl_NewStringObj("::tuapi::const::HOST_NAME_MAX", -1), NULL, Tcl_NewWideIntObj(HOST_NAME_MAX), TCL_GLOBAL_ONLY);
 
 	/* Create high-level user functions */
 	Tcl_Eval(interp,
-#include "system.tcl.h" 
+#include "tuapi.tcl.h" 
 	);
 
-	Tcl_PkgProvide(interp, "system", "0.1");
+	Tcl_PkgProvide(interp, "tuapi", "0.1");
 
 	return(TCL_OK);
 }

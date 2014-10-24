@@ -1,28 +1,28 @@
 #! /usr/bin/env tclsh
 
-namespace eval ::system {}
-namespace eval ::system::helper {}
+namespace eval ::tuapi {}
+namespace eval ::tuapi::helper {}
 
-set ::system::_mount_flags(bind) BIND
-set ::system::_mount_flags(move) MOVE
-set ::system::_mount_flags(remount) REMOUNT
-set ::system::_mount_flags(mandlock) MANDLOCK
-set ::system::_mount_flags(dirsync) DIRSYNC
-set ::system::_mount_flags(noatime) NOATIME
-set ::system::_mount_flags(nodiratime) NODIRATIME
-set ::system::_mount_flags(relatime) RELATIME
-set ::system::_mount_flags(strictatime) STRICTATIME
-set ::system::_mount_flags(nodev) NODEV
-set ::system::_mount_flags(noexec) NOEXEC
-set ::system::_mount_flags(nosuid) NOSUID
-set ::system::_mount_flags(ro) RDONLY
-set ::system::_mount_flags(silent) SILENT
-set ::system::_mount_flags(synchronous) SYNCHRONOUS
-set ::system::_mount_flags(sync) SYNCHRONOUS
+set ::tuapi::_mount_flags(bind) BIND
+set ::tuapi::_mount_flags(move) MOVE
+set ::tuapi::_mount_flags(remount) REMOUNT
+set ::tuapi::_mount_flags(mandlock) MANDLOCK
+set ::tuapi::_mount_flags(dirsync) DIRSYNC
+set ::tuapi::_mount_flags(noatime) NOATIME
+set ::tuapi::_mount_flags(nodiratime) NODIRATIME
+set ::tuapi::_mount_flags(relatime) RELATIME
+set ::tuapi::_mount_flags(strictatime) STRICTATIME
+set ::tuapi::_mount_flags(nodev) NODEV
+set ::tuapi::_mount_flags(noexec) NOEXEC
+set ::tuapi::_mount_flags(nosuid) NOSUID
+set ::tuapi::_mount_flags(ro) RDONLY
+set ::tuapi::_mount_flags(silent) SILENT
+set ::tuapi::_mount_flags(synchronous) SYNCHRONOUS
+set ::tuapi::_mount_flags(sync) SYNCHRONOUS
 
 
 # Determine where to mount a given device (usually by checking "/etc/fstab")
-proc ::system::helper::find_mountpoint {device} {
+proc ::tuapi::helper::find_mountpoint {device} {
 	set data ""
 	catch {
 		set fd [open "/etc/fstab"]
@@ -52,7 +52,7 @@ proc ::system::helper::find_mountpoint {device} {
 	return -code error "no entry found in \"/etc/fstab\" for \"$device\""
 }
 
-proc ::system::mount args {
+proc ::tuapi::mount args {
 	set options_list [list]
 
 	for {set idx 0} {$idx < [llength $args]} {incr idx} {
@@ -93,7 +93,7 @@ proc ::system::mount args {
 	set args [lrange $args $idx end]
 
 	if {[llength $args] < 1 || [llength $args] > 2} {
-		return -code error "wrong # args: should be \"::system::mount ?options? source ?target?\""
+		return -code error "wrong # args: should be \"::tuapi::mount ?options? source ?target?\""
 	}
 
 	set source [lindex $args 0]
@@ -101,7 +101,7 @@ proc ::system::mount args {
 	if {[llength $args] == 2} {
 		set target [lindex $args 1]
 	} else {
-		array set mountinfo [::system::helper::find_mountpoint $source]
+		array set mountinfo [::tuapi::helper::find_mountpoint $source]
 		set source $mountinfo(source)
 		set target $mountinfo(target)
 
@@ -144,15 +144,15 @@ proc ::system::mount args {
 		}
 
 		# Example: noatime
-		if {[info exists ::system::_mount_flags($option_lc)]} {
-			lappend options_list $::system::_mount_flags($option_lc)
+		if {[info exists ::tuapi::_mount_flags($option_lc)]} {
+			lappend options_list $::tuapi::_mount_flags($option_lc)
 
 			continue
 		}
 
 		# Example: atime
-		if {[info exists ::system::_mount_flags(no$option_lc)]} {
-			set idx [lsearch -exact $options_list $::system::_mount_flags(no$option_lc)]
+		if {[info exists ::tuapi::_mount_flags(no$option_lc)]} {
+			set idx [lsearch -exact $options_list $::tuapi::_mount_flags(no$option_lc)]
 			if {$idx != -1} {
 				set options_list [lreplace $options_list $idx $idx]
 			}
@@ -164,8 +164,8 @@ proc ::system::mount args {
 		if {[string match "no*" $option_lc]} {
 			set neg_option_lc [string range $option_lc 2 end]
 
-			if {[info exists ::system::_mount_flags($neg_option_lc)]} {
-				set idx [lsearch -exact $options_list $::system::_mount_flags($neg_option_lc)]
+			if {[info exists ::tuapi::_mount_flags($neg_option_lc)]} {
+				set idx [lsearch -exact $options_list $::tuapi::_mount_flags($neg_option_lc)]
 				if {$idx != -1} {
 					set options_list [lreplace $options_list $idx $idx]
 				}
@@ -180,7 +180,7 @@ proc ::system::mount args {
 
 	# Use "swapon" if this is swap
 	if {$fstype == "swap"} {
-		return [::system::syscall::swapon $source]
+		return [::tuapi::syscall::swapon $source]
 	}
 
 	# Otherwise, call "mount" system call
@@ -189,34 +189,34 @@ proc ::system::mount args {
 	if {[info exists unknown_options]} {
 		set data [join $unknown_options ","]
 
-		return [::system::syscall::mount $source $target $fstype $options_list $data]
+		return [::tuapi::syscall::mount $source $target $fstype $options_list $data]
 	}
 
-	return [::system::syscall::mount $source $target $fstype $options_list]
+	return [::tuapi::syscall::mount $source $target $fstype $options_list]
 }
 
-proc ::system::umount {dir {flags ""}} {
-	return [::system::syscall::umount $dir [string toupper $flags]]
+proc ::tuapi::umount {dir {flags ""}} {
+	return [::tuapi::syscall::umount $dir [string toupper $flags]]
 }
 
-proc ::system::kill {pid sig} {
-	return [::system::syscall::kill $pid [string toupper $sig]]
+proc ::tuapi::kill {pid sig} {
+	return [::tuapi::syscall::kill $pid [string toupper $sig]]
 }
 
-proc ::system::killpg {pgroup sig} {
+proc ::tuapi::killpg {pgroup sig} {
 	if {$pgroup <= 1} {
 		return -code error "invalid process group specified (must be greater than 1)"
 	}
 
-	return [::system::syscall::kill -$pgroup [string toupper $sig]]
+	return [::tuapi::syscall::kill -$pgroup [string toupper $sig]]
 }
 
-proc ::system::ifconfig args {
+proc ::tuapi::ifconfig args {
 	if {[llength $args] == 0} {
 		# Return information on all interfaces
 		set retlist [list]
-		foreach interface [::system::syscall::ifconfig] {
-			lappend retlist $interface [::system::syscall::ifconfig $interface]
+		foreach interface [::tuapi::syscall::ifconfig] {
+			lappend retlist $interface [::tuapi::syscall::ifconfig $interface]
 		}
 
 		return $retlist
@@ -225,7 +225,7 @@ proc ::system::ifconfig args {
 	set interface [lindex $args 0]
 	set args [lrange $args 1 end]
 
-	array set ifaceinfo [::system::syscall::ifconfig $interface]
+	array set ifaceinfo [::tuapi::syscall::ifconfig $interface]
 
 	if {[llength $args] == 0} {
 		return [array get ifaceinfo]
@@ -248,7 +248,7 @@ proc ::system::ifconfig args {
 					}
 				}
 
-				::system::syscall::ifconfig $interface flags $flags
+				::tuapi::syscall::ifconfig $interface flags $flags
 			}
 
 		}

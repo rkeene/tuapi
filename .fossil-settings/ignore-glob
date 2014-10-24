@@ -1,0 +1,5 @@
+tuapi.so
+libtuapi.a
+tuapi.o
+tuapi.tcl.h
+pkgIndex.tcl

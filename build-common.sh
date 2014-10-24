@@ -5,10 +5,12 @@ set -e
 case "$1" in
 	clean|distclean)
 		rm -rf out inst
-		rm -f libsystem.a system.o system.so
-		rm -f system.tcl.h
+		rm -f libtuapi.a tuapi.o tuapi.so
+		rm -f tuapi.tcl.h
 		exit 0
 		;;
 esac
 
-./stringify.tcl system.tcl > system.tcl.h
+tuapi_version="$(grep Tcl_PkgProvide system.c | awk '{ print $3 }' | sed 's@[");]*@@g')"
+
+./stringify.tcl system.tcl > tuapi.tcl.h
