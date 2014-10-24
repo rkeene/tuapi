@@ -4,7 +4,9 @@
 . build-common.sh
 
 # Compile using the same options as Tcl
-TCLCONFIGSH="$(find /usr/lib /usr/lib64 /usr/local/lib /usr/local/lib64 /lib /lib64 -name tclConfig.sh -print -quit)"
+if [ -z "${TCLCONFIGSH}" ]; then
+	TCLCONFIGSH="$(find /usr/lib /usr/lib64 /usr/local/lib /usr/local/lib64 /lib /lib64 -name tclConfig.sh -print -quit)"
+fi
 
 . "${TCLCONFIGSH}"
 

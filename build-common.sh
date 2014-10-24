@@ -2,6 +2,8 @@
 
 set -e
 
+tuapi_version="$(grep Tcl_PkgProvide tuapi.c | awk '{ print $3 }' | sed 's@[");]*@@g')"
+
 case "$1" in
 	clean|distclean)
 		rm -rf out inst
@@ -9,8 +11,9 @@ case "$1" in
 		rm -f tuapi.tcl.h
 		exit 0
 		;;
+	version)
+		echo "${tuapi_version}"
+		;;
 esac
-
-tuapi_version="$(grep Tcl_PkgProvide tuapi.c | awk '{ print $3 }' | sed 's@[");]*@@g')"
 
 ./stringify.tcl tuapi.tcl > tuapi.tcl.h
