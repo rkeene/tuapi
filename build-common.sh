@@ -11,6 +11,6 @@ case "$1" in
 		;;
 esac
 
-tuapi_version="$(grep Tcl_PkgProvide system.c | awk '{ print $3 }' | sed 's@[");]*@@g')"
+tuapi_version="$(grep Tcl_PkgProvide tuapi.c | awk '{ print $3 }' | sed 's@[");]*@@g')"
 
-./stringify.tcl system.tcl > tuapi.tcl.h
+./stringify.tcl tuapi.tcl > tuapi.tcl.h

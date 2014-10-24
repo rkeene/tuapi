@@ -11,8 +11,8 @@ TCLCONFIGSH="${KITCREATORROOT}/tcl/inst/lib/tclConfig.sh"
 
 . "${TCLCONFIGSH}"
 
-echo "${TCL_CC} ${TCL_DEFS} ${TCL_INCLUDE_SPEC} -o tuapi.o -c system.c"
-eval ${TCL_CC} ${TCL_DEFS} ${TCL_INCLUDE_SPEC} -o tuapi.o -c system.c
+echo "${TCL_CC} ${TCL_DEFS} ${TCL_INCLUDE_SPEC} -o tuapi.o -c tuapi.c"
+eval ${TCL_CC} ${TCL_DEFS} ${TCL_INCLUDE_SPEC} -o tuapi.o -c tuapi.c
 ar rcu libtuapi.a tuapi.o
 ranlib libtuapi.a
 
