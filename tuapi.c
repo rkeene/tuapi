@@ -2618,7 +2618,7 @@ int Tuapi_Init(Tcl_Interp *interp) {
 #include "tuapi.tcl.h" 
 	);
 
-	Tcl_PkgProvide(interp, "tuapi", "0.1");
+	Tcl_PkgProvide(interp, "tuapi", "0.2");
 
 	return(TCL_OK);
 }
