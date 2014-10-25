@@ -18,7 +18,7 @@ ranlib libtuapi.a
 
 echo 'package ifneeded tuapi '"${tuapi_version}"' [list load {} tuapi]' > pkgIndex.tcl
 
-mkdir -p inst/lib/tuapi-0.1
-mkdir -p out/lib/tuapi-0.1
-cp libtuapi.a inst/lib/tuapi-0.1
-cp pkgIndex.tcl out/lib/tuapi-0.1
+mkdir -p inst/lib/tuapi-${tuapi_version}
+mkdir -p out/lib/tuapi-${tuapi_version}
+cp libtuapi.a inst/lib/tuapi-${tuapi_version}
+cp pkgIndex.tcl out/lib/tuapi-${tuapi_version}
