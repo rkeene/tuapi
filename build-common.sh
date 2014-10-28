@@ -16,4 +16,4 @@ case "$1" in
 		;;
 esac
 
-./stringify.tcl tuapi.tcl > tuapi.tcl.h
+sed 's@[\\"]@\\&@g;s@^@   "@;s@$@\\n"@' tuapi.tcl > tuapi.tcl.h
