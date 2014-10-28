@@ -7,7 +7,7 @@ export TCLCONFIGSH
 
 all: tuapi.so pkgIndex.tcl
 
-tuapi.so: build-dyn.sh tuapi.c tuapi.tcl stringify.tcl
+tuapi.so: build-dyn.sh tuapi.c tuapi.tcl
 	@echo "Using tclConfig.sh = $(TCLCONFIGSH)"
 	./build-dyn.sh
 
