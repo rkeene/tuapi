@@ -1895,10 +1895,6 @@ static int tuapi_stty(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONS
 		obj = objv[idx];
 		obj_hash = tuapi_internal_simplehash_obj(obj);
 
-		if (obj_hash == 0xe7a7d65) { /* size */
-			continue;
-		}
-
 		switch (obj_hash) {
 			case 0xe7a7d65: /* size */
 				ioctl_ret = ioctl(fd, TIOCGWINSZ, &terminal_size);
@@ -1914,6 +1910,7 @@ static int tuapi_stty(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONS
 
 				Tcl_ListObjAppendElement(interp, retobj, Tcl_NewLongObj(terminal_size.ws_row));
 				Tcl_ListObjAppendElement(interp, retobj, Tcl_NewLongObj(terminal_size.ws_col));
+
 				break;
 			case 0x5bcb0f7: /* -raw */
 			case 0x1cb0f7: /* raw */
