@@ -10,7 +10,7 @@ fi
 
 . "${TCLCONFIGSH}"
 
-echo "${TCL_CC} -ggdb3 -fPIC -DPIC -Wall -DUSE_TCL_STUBS=1 ${TCL_DEFS} ${TCL_INCLUDE_SPEC} ${TCL_STUB_LIB_SPEC} -shared -rdynamic -o tuapi.so tuapi.c"
-eval ${TCL_CC} -ggdb3 -fPIC -DPIC -Wall -DUSE_TCL_STUBS=1 ${TCL_DEFS} ${TCL_INCLUDE_SPEC} ${TCL_STUB_LIB_SPEC} -shared -rdynamic -o tuapi.so tuapi.c
+echo "${TCL_CC} -ggdb3 -fPIC -DPIC -Wall -DUSE_TCL_STUBS=1 ${TCL_DEFS} ${TCL_INCLUDE_SPEC} -shared -rdynamic -o tuapi.so tuapi.c ${TCL_STUB_LIB_SPEC}"
+eval ${TCL_CC} -ggdb3 -fPIC -DPIC -Wall -DUSE_TCL_STUBS=1 ${TCL_DEFS} ${TCL_INCLUDE_SPEC} -shared -rdynamic -o tuapi.so tuapi.c ${TCL_STUB_LIB_SPEC}
 
 echo 'package ifneeded tuapi '"${tuapi_version}"' [list load [file join $dir tuapi.so]]' > pkgIndex.tcl
