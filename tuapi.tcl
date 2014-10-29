@@ -254,3 +254,54 @@ proc ::tuapi::ifconfig args {
 		}
 	}
 }
+
+proc ::tuapi::internal::foreach_line {fd {sep ""} code} {
+	while {![eof $fd]} {
+		gets $fd line
+
+		regsub { *#.*$} $line {} line
+
+		if {$line == ""} {
+			continue
+		}
+
+		if {$sep == ""} {
+			set line [split $line]
+		} else {
+			set line [split $line $sep]
+		}
+
+		uplevel 1 [list set line $line]
+		uplevel 1 $code
+	}
+	uplevel 1 [list unset -nocomplain line]
+}
+
+proc ::tuapi::modprobe args {
+	# Load aliases
+	set modules_dir [file join /lib/modules $::tcl_platform(osVersion)]
+	set aliases_file [file join $modules_dir modules.alias]
+	set fd [open $aliases_file]
+	::tuapi::internal::foreach_line $fd {
+		set alias [lindex $line 1]
+		set module [lindex $line 2]
+
+		set alias2module($alias) $module
+	}
+
+	close $fd
+
+	# Load dependencies
+	set deps_file [file join $modules_dir modules.dep]
+	::tuapi::internal::foreach_line $fd ":" {
+		set module [string trim [lindex $line 0]]
+		set deps [split [string trim [lrange $line 1 end]]]
+		puts "$module -> $deps"
+	}
+
+	# Load modules
+	foreach modules $args {
+		foreach module $modules {
+		}
+	}
+}

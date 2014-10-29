@@ -4,6 +4,8 @@ puts [exec ./build-dyn.sh]
 
 load ./tuapi.so
 
+::tuapi::modprobe fuse
+
 ::tuapi::syscall::tsmf_start_svc blah /bin/true /tmp/logfile [list PATH=/bin] / 022 0 0 10
 
 foreach iface [tuapi::syscall::ifconfig] {
