@@ -1,5 +1,6 @@
 #define _LINUX_SOURCE 1
 #include <sys/syscall.h>
+#include <sys/termios.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
@@ -1879,6 +1880,100 @@ static int tuapi_vconfig(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *C
 	return(retval);
 }
 
+static int tuapi_stty(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
+	Tcl_Obj *obj, *retobj = NULL;
+	struct termios terminal_information;
+	struct winsize terminal_size;
+	unsigned long obj_hash;
+	int fd, idx;
+	int ioctl_ret;
+	int retval = TCL_OK;
+
+	fd = STDIN_FILENO;
+
+	for (idx = 1; idx < objc; idx++) {
+		obj = objv[idx];
+		obj_hash = tuapi_internal_simplehash_obj(obj);
+
+		if (obj_hash == 0xe7a7d65) { /* size */
+			continue;
+		}
+
+		switch (obj_hash) {
+			case 0xe7a7d65: /* size */
+				ioctl_ret = ioctl(fd, TIOCGWINSZ, &terminal_size);
+				if (ioctl_ret != 0) {
+					Tcl_SetObjResult(interp, Tcl_NewStringObj("ioctl failed", -1));
+
+					return(TCL_ERROR);
+				}
+
+				if (retobj == NULL) {
+					retobj = Tcl_NewObj();
+				}
+
+				Tcl_ListObjAppendElement(interp, retobj, Tcl_NewLongObj(terminal_size.ws_row));
+				Tcl_ListObjAppendElement(interp, retobj, Tcl_NewLongObj(terminal_size.ws_col));
+				break;
+			case 0x5bcb0f7: /* -raw */
+			case 0x1cb0f7: /* raw */
+			case 0xdcb8f56f: /* -echo */
+			case 0xcb8f46f: /* echo */
+				ioctl_ret = ioctl(fd, TCGETS, &terminal_information);
+				if (ioctl_ret != 0) {
+					Tcl_SetObjResult(interp, Tcl_NewStringObj("ioctl failed", -1));
+
+					return(TCL_ERROR);
+				}
+
+				switch (obj_hash) {
+					case 0x5bcb0f7: /* -raw */
+						terminal_information.c_iflag |= BRKINT | IGNPAR | ISTRIP | ICRNL | IXON;
+						terminal_information.c_oflag |= OPOST;
+						terminal_information.c_lflag |= ISIG | ICANON;
+#if VMIN == VEOF
+						terminal_information.c_cc[VEOF] = CEOF;
+#endif
+#if VTIME == VEOL
+						terminal_information.c_cc[VEOL] = CEOL;
+#endif
+						break;
+					case 0x1cb0f7: /* raw */
+						terminal_information.c_iflag &= ~(IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR | IGNCR | ICRNL | IXON);
+						terminal_information.c_oflag &= ~OPOST;
+						terminal_information.c_lflag &= ~(ISIG | ICANON);
+						terminal_information.c_cc[VMIN] = 1;
+						terminal_information.c_cc[VTIME] = 0;
+						break;
+					case 0xdcb8f56f: /* -echo */
+						terminal_information.c_lflag &= ~ECHO;
+						break;
+					case 0xcb8f46f: /* echo */
+						terminal_information.c_lflag |= ECHO;
+						break;
+				}
+
+				ioctl_ret = ioctl(fd, TCSETS, &terminal_information);
+				if (ioctl_ret != 0) {
+					Tcl_SetObjResult(interp, Tcl_NewStringObj("ioctl failed", -1));
+
+					return(TCL_ERROR);
+				}
+
+				break;
+			default:
+				Tcl_SetObjResult(interp, Tcl_NewStringObj("subcommand not implemented", -1));
+				return(TCL_ERROR);
+		}
+	}
+
+	if (retobj != NULL) {
+		Tcl_SetObjResult(interp, retobj);
+	}
+
+	return(retval);
+}
+
 #ifndef DISABLE_UNIX_SOCKETS
 struct tuapi_socket_unix__chan_id {
 	int fd;
@@ -2596,6 +2691,9 @@ int Tuapi_Init(Tcl_Interp *interp) {
 	Tcl_CreateObjCommand(interp, "::tuapi::syscall::route", tuapi_route, NULL, NULL);
 	Tcl_CreateObjCommand(interp, "::tuapi::syscall::brctl", tuapi_brctl, NULL, NULL);
 	Tcl_CreateObjCommand(interp, "::tuapi::syscall::vconfig", tuapi_vconfig, NULL, NULL);
+
+	/* Terminal related commands */
+	Tcl_CreateObjCommand(interp, "::tuapi::syscall::stty", tuapi_stty, NULL, NULL);
 
 	/* Needed commands for basic services Tcl lacks */
 	Tcl_CreateObjCommand(interp, "::tuapi::syscall::socket_unix", tuapi_socket_unix, NULL, NULL);
