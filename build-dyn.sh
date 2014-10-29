@@ -1,7 +1,7 @@
 # /bin/bash
 
 # Perform common build options
-. build-common.sh
+. ./build-common.sh
 
 # Compile using the same options as Tcl
 if [ -z "${TCLCONFIGSH}" ]; then
