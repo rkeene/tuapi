@@ -274,8 +274,28 @@ proc ::tuapi::internal::foreach_line {fd sep code} {
 }
 
 proc ::tuapi::modprobe args {
-	# Load aliases
+	# Set module base directory
 	set modules_dir [file join /lib/modules $::tcl_platform(osVersion)]
+
+	# Load device names
+	set devnames_file [file join $modules_dir modules.devname]
+	set fd [open $devnames_file]
+	::tuapi::internal::foreach_line $fd " " {
+		set module [lindex $line 0]
+		set device [lindex $line 1]
+		set id [lindex $line 2]
+
+		set id_type [string index $id 0]
+		set id_type [string map [list "c" "char" "b" "block"] $id_type]
+		set id [split [string range $id 1 end] :]
+		set id_alias "${id_type}-major-[lindex $id 0]-[lindex $id 1]"
+
+		set "alias2module(/dev/${device})" $module
+		set alias2module($id_alias) $module
+	}
+	close $fd
+
+	# Load aliases
 	set aliases_file [file join $modules_dir modules.alias]
 	set fd [open $aliases_file]
 	::tuapi::internal::foreach_line $fd " " {
@@ -327,6 +347,10 @@ proc ::tuapi::modprobe args {
 			lappend load $module
 
 			foreach module $load {
+				if {[string match "/dev/*" $module]} {
+					return -code error "Unable to lookup device node module for $module"
+				}
+
 				set module [file join $modules_dir $module]
 
 				::tuapi::syscall::insmod $module
