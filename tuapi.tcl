@@ -255,7 +255,7 @@ proc ::tuapi::ifconfig args {
 	}
 }
 
-proc ::tuapi::internal::foreach_line {fd {sep ""} code} {
+proc ::tuapi::internal::foreach_line {fd sep code} {
 	while {![eof $fd]} {
 		gets $fd line
 
@@ -265,11 +265,7 @@ proc ::tuapi::internal::foreach_line {fd {sep ""} code} {
 			continue
 		}
 
-		if {$sep == ""} {
-			set line [split $line]
-		} else {
-			set line [split $line $sep]
-		}
+		set line [split $line $sep]
 
 		uplevel 1 [list set line $line]
 		uplevel 1 $code
@@ -282,26 +278,59 @@ proc ::tuapi::modprobe args {
 	set modules_dir [file join /lib/modules $::tcl_platform(osVersion)]
 	set aliases_file [file join $modules_dir modules.alias]
 	set fd [open $aliases_file]
-	::tuapi::internal::foreach_line $fd {
+	::tuapi::internal::foreach_line $fd " " {
 		set alias [lindex $line 1]
 		set module [lindex $line 2]
 
 		set alias2module($alias) $module
 	}
-
 	close $fd
 
 	# Load dependencies
 	set deps_file [file join $modules_dir modules.dep]
+	set fd [open $deps_file]
 	::tuapi::internal::foreach_line $fd ":" {
 		set module [string trim [lindex $line 0]]
-		set deps [split [string trim [lrange $line 1 end]]]
-		puts "$module -> $deps"
+		set deps [split [string trim [join [lrange $line 1 end]]]]
+
+		set module_basename [file rootname [file tail $module]]
+		set module_basename_alt1 [string map [list "_" "-"] $module_basename]
+		set module_basename_alt2 [string map [list "-" "_"] $module_basename]
+
+		set alias2module($module_basename) $module
+		set alias2module($module_basename_alt1) $module
+		set alias2module($module_basename_alt2) $module
+
+		if {[llength $deps] != 0} {
+			set module2deps($module) $deps
+		}
 	}
+	close $fd
 
 	# Load modules
 	foreach modules $args {
 		foreach module $modules {
+			for {set try 0} {$try < 100} {incr try} {
+				if {![info exists alias2module($module)]} {
+					break
+				}
+
+				set module $alias2module($module)
+			}
+
+			if {[info exists module2deps($module)]} {
+				set load $module2deps($module)
+			} else {
+				set load [list]
+			}
+
+			lappend load $module
+
+			foreach module $load {
+				set module [file join $modules_dir $module]
+
+				::tuapi::syscall::insmod $module
+			}
 		}
 	}
 }
