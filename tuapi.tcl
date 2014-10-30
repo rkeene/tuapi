@@ -255,7 +255,7 @@ proc ::tuapi::ifconfig args {
 	}
 }
 
-proc ::tuapi::internal::foreach_line {fd sep code} {
+proc ::tuapi::helper::foreach_line {fd sep code} {
 	while {![eof $fd]} {
 		gets $fd line
 
@@ -280,7 +280,7 @@ proc ::tuapi::modprobe args {
 	# Load device names
 	set devnames_file [file join $modules_dir modules.devname]
 	set fd [open $devnames_file]
-	::tuapi::internal::foreach_line $fd " " {
+	::tuapi::helper::foreach_line $fd " " {
 		set module [lindex $line 0]
 		set device [lindex $line 1]
 		set id [lindex $line 2]
@@ -298,7 +298,7 @@ proc ::tuapi::modprobe args {
 	# Load aliases
 	set aliases_file [file join $modules_dir modules.alias]
 	set fd [open $aliases_file]
-	::tuapi::internal::foreach_line $fd " " {
+	::tuapi::helper::foreach_line $fd " " {
 		set alias [lindex $line 1]
 		set module [lindex $line 2]
 
@@ -309,7 +309,7 @@ proc ::tuapi::modprobe args {
 	# Load dependencies
 	set deps_file [file join $modules_dir modules.dep]
 	set fd [open $deps_file]
-	::tuapi::internal::foreach_line $fd ":" {
+	::tuapi::helper::foreach_line $fd ":" {
 		set module [string trim [lindex $line 0]]
 		set deps [split [string trim [join [lrange $line 1 end]]]]
 
@@ -356,5 +356,152 @@ proc ::tuapi::modprobe args {
 				::tuapi::syscall::insmod $module
 			}
 		}
+	}
+}
+
+# Create UNIX-like procs meant to be used interactively
+proc ::tuapi::create_unix_commands {} {
+	proc ::cat args {
+		foreach file $args {
+			if {[catch {
+				set fd [open $file]
+			} err]} {
+				puts stderr "Unable to open \"$file\": $err"
+
+				continue
+			}
+
+			fcopy $fd stdout
+			close $fd
+		}
+	}
+
+	proc ::ls args {
+		set options(long) 0
+		set options(one) 0
+		set options(skipdot) 1
+		set options(norecurseintotopleveldirs) 0
+
+		set idx 0
+		foreach arg $args {
+			if {[string match "-*" $arg]} {
+				set args [lreplace $args $idx $idx]
+				if {$arg == "--"} {
+					break
+				}
+
+				if {[string range $arg 0 1] == "--"} {
+					set opts [list [string range $arg 2 end]]
+				} else {
+					set opts [split [string range $arg 1 end] ""]
+				}
+
+				foreach opt $opts {
+					switch -- $opt {
+						"l" {
+							set options(long) 1
+							set options(one) 0
+						}
+						"1" {
+							set options(one) 1
+							set options(long) 0
+						}
+						"d" {
+							set options(norecurseintotopleveldirs) 1
+						}
+						"a" {
+							set options(skipdot) 0
+						}
+					}
+				}
+
+				continue
+			}
+
+			incr idx
+		}
+
+		if {[llength $args] == 0} {
+			set args [list "."]
+		}
+
+		set nodes [list]
+		foreach arg $args {
+			unset -nocomplain fileinfo
+			catch {
+				file stat $arg fileinfo
+			}
+
+			if {![info exists fileinfo]} {
+				puts stderr "No such file or directory: $arg"
+
+				continue
+			}
+
+			if {$fileinfo(type) == "directory"} {
+				if {$options(norecurseintotopleveldirs)} {
+					lappend nodes $arg
+				} else {
+					lappend nodes {*}[glob -nocomplain -directory $arg -tails *]
+				}
+			} else {
+				lappend nodes $arg
+			}
+
+		}
+
+		set newline_required 0
+		foreach node $nodes {
+			unset -nocomplain fileinfo
+
+			if {$options(one)} {
+				puts $node
+			} elseif {$options(long)} {
+				catch {
+					file stat $node fileinfo
+				}
+
+				if {![info exists fileinfo]} {
+					array set fileinfo [list mode 0 nlink 0 uid -1 gid -1 size 0 mtime 0]
+				}
+
+				set date [clock format $fileinfo(mtime) -format {%b %e %H:%M}]
+
+				switch -- $fileinfo(type) {
+					"directory" {
+						set typeid "d"
+					}
+					"blockSpecial" {
+						set typeid "b"
+					}
+					"characterSpecial" {
+						set typeid "c"
+					}
+					"file" {
+						set typeid "-"
+					}
+					"socket" {
+						set typeid "s"
+					}
+					default {
+						set typeid "?"
+					}
+				}
+
+				puts [format {%s%04o %5s %6s %6s %10s %12s %s} $typeid [expr {$fileinfo(mode) & 07777}] $fileinfo(nlink) $fileinfo(uid) $fileinfo(gid) $fileinfo(size) $date $node]
+
+			} else {
+				puts -nonewline "$node "
+				set newline_required 1
+			}
+		}
+
+		if {$newline_required} {
+			puts ""
+		}
+	}
+
+	proc ::modprobe args {
+		::tuapi::modprobe {*}$args
 	}
 }
