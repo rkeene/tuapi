@@ -504,4 +504,54 @@ proc ::tuapi::create_unix_commands {} {
 	proc ::modprobe args {
 		::tuapi::modprobe {*}$args
 	}
+
+	proc ::ps {} {
+		set format {%-6s %5s %5s %3s %5s %-6s %8s %s}
+		puts [format $format UID PID PPID C STIME TTY TIME CMD]
+		foreach pid [lsort -dictionary [glob -nocomplain -directory /proc -tails {[0-9]*}]] {
+			if {![string is integer $pid]} {
+				continue
+			}
+
+			set procfile [file join /proc $pid]
+
+			unset -nocomplain pidinfo
+			catch {
+				file stat $procfile pidinfo
+			}
+
+			if {![info exists pidinfo]} {
+				continue
+			}
+
+			set pidinfo(pid) $pid
+			set pidinfo(ppid) ?
+			set pidinfo(cpuutil) ?
+			set pidinfo(starttime) ?
+			set pidinfo(tty) ?
+			set pidinfo(cputime) ?
+			set pidinfo(cmd) ""
+
+			unset -nocomplain fd
+			catch {
+				set fd [open [file join $procfile cmdline]]
+			}
+			if {[info exists fd]} {
+				set pidinfo(cmd) [string trim [join [split [read $fd] "\0\n\r"]]]
+				close $fd
+				unset fd
+			}
+			if {![info exists pidinfo(cmd)] || $pidinfo(cmd) == ""} {
+				catch {
+					set fd [open [file join $procfile comm]]
+				}
+				if {[info exists fd]} {
+					set pidinfo(cmd) "\[[string trim [join [split [read $fd] "\0\n\r"]]]\]"
+					close $fd
+				}
+			}
+
+			puts [format $format $pidinfo(uid) $pidinfo(pid) $pidinfo(ppid) $pidinfo(cpuutil) $pidinfo(starttime) $pidinfo(tty) $pidinfo(cputime) $pidinfo(cmd)]
+		}
+	}
 }
