@@ -1,4 +1,5 @@
 #define _LINUX_SOURCE 1
+#include <sys/resource.h>
 #include <sys/syscall.h>
 #include <sys/termios.h>
 #include <netinet/in.h>
@@ -8,6 +9,8 @@
 #include <sys/mount.h>
 #include <sys/types.h>
 #include <sys/ioctl.h>
+#include <sys/time.h>
+#include <sys/klog.h>
 #include <sys/swap.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
@@ -43,6 +46,24 @@
 #endif
 #ifndef MS_MOVE
 #define MS_MOVE 8192
+#endif
+#ifndef SYSLOG_ACTION_CLOSE
+#define SYSLOG_ACTION_CLOSE 0
+#endif
+#ifndef SYSLOG_ACTION_OPEN
+#define SYSLOG_ACTION_OPEN 1
+#endif
+#ifndef SYSLOG_ACTION_READ_ALL
+#define SYSLOG_ACTION_READ_ALL 3
+#endif
+#ifndef SYSLOG_ACTION_CLEAR
+#define SYSLOG_ACTION_CLEAR 5
+#endif
+#ifndef SYSLOG_ACTION_CONSOLE_OFF
+#define SYSLOG_ACTION_CONSOLE_OFF 6
+#endif
+#ifndef SYSLOG_ACTION_CONSOLE_ON
+#define SYSLOG_ACTION_CONSOLE_ON 7
 #endif
 
 /* Simple macros */
@@ -1971,6 +1992,253 @@ static int tuapi_stty(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONS
 	return(retval);
 }
 
+static int tuapi_rlimit(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
+	Tcl_Obj *operation_obj, *resource_id_obj, *resource_val_item_obj, *resource_val_itemval_obj, *ret_obj;
+	struct rlimit resource_val;
+	Tcl_WideInt resource_val_item;
+	int resource_id;
+	int rlimit_ret, tcl_ret;
+
+	if (objc < 3) {
+		Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"::tuapi::syscall::rlimit operation resource ?value?\"", -1));
+
+		return(TCL_ERROR);
+	}
+
+	operation_obj = objv[1];
+	resource_id_obj = objv[2];
+
+	switch (tuapi_internal_simplehash_obj(resource_id_obj)) {
+		case 0x20d3LU: /* AS */
+			resource_id = RLIMIT_AS;
+			break;
+		case 0x873e945LU: /* CORE */
+			resource_id = RLIMIT_CORE;
+			break;
+		case 0x10e855LU: /* CPU */
+			resource_id = RLIMIT_CPU;
+			break;
+		case 0x8906a41LU: /* DATA */
+			resource_id = RLIMIT_DATA;
+			break;
+		case 0x6a726f45LU: /* FSIZE */
+			resource_id = RLIMIT_FSIZE;
+			break;
+#ifdef RLIMIT_LOCKS
+		case 0xc9f0e7d3LU: /* LOCKS */
+			resource_id = RLIMIT_LOCKS;
+			break;
+#endif
+		case 0xd908f7cbLU: /* MEMLOCK */
+			resource_id = RLIMIT_MEMLOCK;
+			break;
+#ifdef RLIMIT_MSGQUEUE
+		case 0x57167445LU: /* MSGQUEUE */
+			resource_id = RLIMIT_MSGQUEUE;
+			break;
+#endif
+		case 0x9d261c5LU: /* NICE */
+			resource_id = RLIMIT_NICE;
+			break;
+		case 0xf8d35c45LU: /* NOFILE */
+		case 0xf8d26445LU: /* OFILE */
+			resource_id = RLIMIT_NOFILE;
+			break;
+		case 0xea14a5c3LU: /* NPROC */
+			resource_id = RLIMIT_NPROC;
+			break;
+		case 0x14a9d3LU: /* RSS */
+			resource_id = RLIMIT_RSS;
+			break;
+#ifdef RLIMIT_RTPRIO
+		case 0x4a15ee4fLU: /* RTPRIO */
+			resource_id = RLIMIT_RTPRIO;
+			break;
+#endif
+#ifdef RLIMIT_RTTIME
+		case 0x4a932c45LU: /* RTTIME */
+			resource_id = RLIMIT_RTTIME;
+			break;
+#endif
+#ifdef RLIMIT_SIGPENDING
+		case 0x2f390347LU: /* SIGPENDING */
+			resource_id = RLIMIT_SIGPENDING;
+			break;
+#endif
+		case 0x3a90634bLU: /* STACK */
+			resource_id = RLIMIT_STACK;
+			break;
+		default:
+			Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid resource", -1));
+
+			return(TCL_ERROR);
+	}
+
+	if (strcmp(Tcl_GetString(operation_obj), "get") == 0) {
+		if (objc != 3) {
+			Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"::tuapi::syscall::rlimit get resource\"", -1));
+
+			return(TCL_ERROR);
+		}
+
+		rlimit_ret = getrlimit(resource_id, &resource_val);
+		if (rlimit_ret != 0) {
+			Tcl_SetObjResult(interp, Tcl_NewStringObj("getrlimit() failed", -1));
+
+			return(TCL_ERROR);
+		}
+
+		ret_obj = Tcl_NewObj();
+		Tcl_ListObjAppendElement(interp, ret_obj, Tcl_NewStringObj("soft", -1));
+		Tcl_ListObjAppendElement(interp, ret_obj, Tcl_NewWideIntObj(resource_val.rlim_cur));
+		Tcl_ListObjAppendElement(interp, ret_obj, Tcl_NewStringObj("hard", -1));
+		Tcl_ListObjAppendElement(interp, ret_obj, Tcl_NewWideIntObj(resource_val.rlim_max));
+
+		Tcl_SetObjResult(interp, ret_obj);
+
+		return(TCL_OK);
+	}
+
+	if (strcmp(Tcl_GetString(operation_obj), "set") == 0) {
+		if (objc != 4) {
+			Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"::tuapi::syscall::rlimit set resource value\"", -1));
+
+			return(TCL_ERROR);
+		}
+
+		resource_val_item_obj = objv[3];
+
+		/* Determine if we were asked to set to a simple value, in which case set both hard and soft limits */
+		tcl_ret = Tcl_GetWideIntFromObj(NULL, resource_val_item_obj, &resource_val_item);
+		if (tcl_ret == TCL_OK) {
+			resource_val.rlim_cur = resource_val_item;
+			resource_val.rlim_max = resource_val_item;
+		} else {
+			tcl_ret = Tcl_DictObjGet(NULL, resource_val_item_obj, Tcl_NewStringObj("soft", -1), &resource_val_itemval_obj);
+			if (tcl_ret != TCL_OK) {
+				Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid request", -1));
+
+				return(TCL_ERROR);
+			}
+
+			tcl_ret = Tcl_GetWideIntFromObj(NULL, resource_val_itemval_obj, &resource_val_item);
+			if (tcl_ret != TCL_OK) {
+				Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid request", -1));
+
+				return(TCL_ERROR);
+			}
+
+			resource_val.rlim_cur = resource_val_item;
+
+			tcl_ret = Tcl_DictObjGet(NULL, resource_val_item_obj, Tcl_NewStringObj("hard", -1), &resource_val_itemval_obj);
+			if (tcl_ret != TCL_OK) {
+				Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid request", -1));
+
+				return(TCL_ERROR);
+			}
+
+			tcl_ret = Tcl_GetWideIntFromObj(NULL, resource_val_itemval_obj, &resource_val_item);
+			if (tcl_ret != TCL_OK) {
+				Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid request", -1));
+
+				return(TCL_ERROR);
+			}
+
+			resource_val.rlim_max = resource_val_item;
+		}
+
+		rlimit_ret = setrlimit(resource_id, &resource_val);
+		if (rlimit_ret != 0) {
+			Tcl_SetObjResult(interp, Tcl_NewStringObj("setrlimit() failed", -1));
+
+			return(TCL_ERROR);
+		}
+
+		return(TCL_OK);
+	}
+
+	Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid operation", -1));
+
+	return(TCL_ERROR);
+}
+
+static int tuapi_klogctl(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
+	Tcl_Obj *operation_obj;
+	char *buf;
+	int buflen;
+	int klog_ret;
+
+	if (objc < 2) {
+		Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"::tuapi::syscall::klogctl operation ...\"", -1));
+
+		return(TCL_ERROR);
+	}
+
+	klog_ret = klogctl(SYSLOG_ACTION_OPEN, NULL, 0);
+	if (klog_ret != 0) {
+		Tcl_SetObjResult(interp, Tcl_NewStringObj("klogctl(SYSLOG_ACTION_OPEN, ...) failed", -1));
+		return(TCL_ERROR);
+	}
+
+	operation_obj = objv[1];
+	switch (tuapi_internal_simplehash_obj(operation_obj)) {
+		case 0xe5970e4LU: /* read */
+			buflen = 256 * 1024;
+			buf = malloc(buflen);
+			if (buf == NULL) {
+				Tcl_SetObjResult(interp, Tcl_NewStringObj("malloc failed !", -1));
+
+				return(TCL_ERROR);
+			}
+
+			klog_ret = klogctl(SYSLOG_ACTION_READ_ALL, buf, buflen);
+			if (klog_ret == -1) {
+				free(buf);
+
+				Tcl_SetObjResult(interp, Tcl_NewStringObj("klogctl(SYSLOG_ACTION_READ_ALL, ...) failed", -1));
+
+				return(TCL_ERROR);
+			}
+
+			Tcl_SetObjResult(interp, Tcl_NewByteArrayObj((unsigned char *) buf, klog_ret));
+
+			free(buf);
+
+			return(TCL_OK);
+		case 0x3d9973f2LU: /* clear */
+			klog_ret = klogctl(SYSLOG_ACTION_CLEAR, NULL, 0);
+			if (klog_ret == -1) {
+				Tcl_SetObjResult(interp, Tcl_NewStringObj("klogctl(SYSLOG_ACTION_CLEAR, ...) failed", -1));
+
+				return(TCL_ERROR);
+			}
+
+			return(TCL_OK);
+		case 0x225c336eLU: /* console_on */
+			klog_ret = klogctl(SYSLOG_ACTION_CONSOLE_ON, NULL, 0);
+			if (klog_ret == -1) {
+				Tcl_SetObjResult(interp, Tcl_NewStringObj("klogctl(SYSLOG_ACTION_CONSOLE_ON, ...) failed", -1));
+
+				return(TCL_ERROR);
+			}
+
+			return(TCL_OK);
+		case 0x2e19bbe6LU: /* console_off */
+			klog_ret = klogctl(SYSLOG_ACTION_CONSOLE_OFF, NULL, 0);
+			if (klog_ret == -1) {
+				Tcl_SetObjResult(interp, Tcl_NewStringObj("klogctl(SYSLOG_ACTION_CONSOLE_OFF, ...) failed", -1));
+
+				return(TCL_ERROR);
+			}
+
+			return(TCL_OK);
+	}
+
+	Tcl_SetObjResult(interp, Tcl_NewStringObj("invalid subcommand", -1));
+
+	return(TCL_ERROR);
+}
+
 #ifndef DISABLE_UNIX_SOCKETS
 struct tuapi_socket_unix__chan_id {
 	int fd;
@@ -2664,6 +2932,7 @@ int Tuapi_Init(Tcl_Interp *interp) {
 	Tcl_CreateObjCommand(interp, "::tuapi::syscall::lsmod", tuapi_lsmod, NULL, NULL);
 	Tcl_CreateObjCommand(interp, "::tuapi::syscall::hostname", tuapi_hostname, NULL, NULL);
 	Tcl_CreateObjCommand(interp, "::tuapi::syscall::domainname", tuapi_domainname, NULL, NULL);
+	Tcl_CreateObjCommand(interp, "::tuapi::syscall::klogctl", tuapi_klogctl, NULL, NULL);
 
 	/* Block or char device related commands */
 	Tcl_CreateObjCommand(interp, "::tuapi::syscall::losetup", tuapi_losetup, NULL, NULL);
@@ -2682,6 +2951,7 @@ int Tuapi_Init(Tcl_Interp *interp) {
 	Tcl_CreateObjCommand(interp, "::tuapi::syscall::kill", tuapi_kill, NULL, NULL);
 	Tcl_CreateObjCommand(interp, "::tuapi::syscall::ps", tuapi_ps, NULL, NULL);
 	Tcl_CreateObjCommand(interp, "::tuapi::syscall::execve", tuapi_execve, NULL, NULL);
+	Tcl_CreateObjCommand(interp, "::tuapi::syscall::rlimit", tuapi_rlimit, NULL, NULL);
 
 	/* Network related commands */
 	Tcl_CreateObjCommand(interp, "::tuapi::syscall::ifconfig", tuapi_ifconfig, NULL, NULL);
