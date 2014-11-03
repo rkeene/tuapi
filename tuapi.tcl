@@ -242,7 +242,7 @@ proc ::tuapi::ifconfig args {
 					set flags ""
 				}
 
-				foreach newflag [list UP RUNNING] {
+				foreach newflag [list UP] {
 					if {[lsearch -exact $flags $newflag] == -1} {
 						lappend flags $newflag
 					}
@@ -250,7 +250,26 @@ proc ::tuapi::ifconfig args {
 
 				::tuapi::syscall::ifconfig $interface flags $flags
 			}
+			"down" {
+				if {[info exists ifaceinfo(flags)]} {
+					set flags $ifaceinfo(flags)
+				} else {
+					set flags ""
+				}
 
+				set flagidx [lsearch -exact $flags "UP"]
+				if {$flagidx != -1} {
+					set flags [lreplace $flags $flagidx $flagidx]
+
+					::tuapi::syscall::ifconfig $interface flags $flags
+				}
+			}
+			default {
+				incr idx
+				set optval [lindex $args $idx]
+
+				::tuapi::syscall::ifconfig $interface $opt $optval
+			}
 		}
 	}
 }
@@ -625,6 +644,42 @@ proc ::tuapi::create_unix_commands {} {
 			}
 
 			puts "${include_help}$optval"
+		}
+	}
+
+	proc ::ifconfig {{ifacelist ""} {config ""}} {
+		if {$ifacelist == "" || $ifacelist == "-a"} {
+			set ifacelist [tuapi::syscall::ifconfig]
+			set config ""
+		}
+
+		if {$config != ""} {
+			if {[string match "*.*.*.*" [lindex $config 0]]} {
+				set config [linsert $config 0 "address"]
+			}
+
+			puts [list ::tuapi::ifconfig [lindex $ifacelist 0] {*}$config]
+			return [::tuapi::ifconfig [lindex $ifacelist 0] {*}$config]
+		}
+
+		foreach iface $ifacelist {
+			unset -nocomplain ifaceinfo
+			array set ifaceinfo [tuapi::syscall::ifconfig $iface]
+
+			set secondline ""
+			foreach {label entry} [list inet address netmask netmask broadcast broadcast] {
+				if {![info exists ifaceinfo($entry)]} {
+					continue
+				}
+
+				append secondline " $label $ifaceinfo($entry)"
+			}
+
+			puts "$iface: flags=<[join $ifaceinfo(flags) ,]> mtu $ifaceinfo(mtu) index $ifaceinfo(index)"
+			puts "\t[string trim $secondline]"
+			if {[info exists ifaceinfo(hwaddr)]} {
+				puts "\tether $ifaceinfo(hwaddr)"
+			}
 		}
 	}
 }
