@@ -554,4 +554,77 @@ proc ::tuapi::create_unix_commands {} {
 			puts [format $format $pidinfo(uid) $pidinfo(pid) $pidinfo(ppid) $pidinfo(cpuutil) $pidinfo(starttime) $pidinfo(tty) $pidinfo(cputime) $pidinfo(cmd)]
 		}
 	}
+
+	proc ::dmesg {} {
+		puts [::tuapi::syscall::klogctl read]
+	}
+
+	proc ::ulimit {limit {val ""}} {
+		set mapping(-c) [list CORE]
+		set mapping(-d) [list DATA]
+		set mapping(-e) [list NICE]
+		set mapping(-f) [list FSIZE]
+		set mapping(-i) [list SIGPENDING]
+		set mapping(-l) [list MEMLOCK]
+		set mapping(-m) [list RSS]
+		set mapping(-n) [list NOFILE]
+		set mapping(-q) [list MSGQUEUE]
+		set mapping(-r) [list RTPRIO]
+		set mapping(-s) [list STACK]
+		set mapping(-t) [list CPU]
+		set mapping(-u) [list NPROC]
+		set mapping(-v) [list AS]
+		set mapping(-x) [list LOCKS]
+		set help(CORE) {core file size          (blocks, -c)}
+		set help(DATA) {data seg size           (kbytes, -d)}
+		set help(NICE) {scheduling priority             (-e)}
+		set help(FSIZE) {file size               (blocks, -f)}
+		set help(SIGPENDING) {pending signals                 (-i)}
+		set help(MEMLOCK) {max locked memory       (kbytes, -l)}
+		set help(RSS) {max memory size         (kbytes, -m)}
+		set help(NOFILE) {open files                      (-n)}
+		set help(-p) {pipe size            (512 bytes, -p)}
+		set help(MSGQUEUE) {POSIX message queues     (bytes, -q)}
+		set help(RTPRIO) {real-time priority              (-r)}
+		set help(STACK) {stack size              (kbytes, -s)}
+		set help(CPU) {cpu time               (seconds, -t)}
+		set help(NPROC) {max user processes              (-u)}
+		set help(AS) {virtual memory          (kbytes, -v)}
+		set help(LOCKS) {file locks                      (-x)}
+
+		foreach {limitopt limitoptvals} [array get mapping] {
+			foreach limitoptval $limitoptvals {
+				lappend mapping(-a) $limitoptval
+			}
+		}
+
+		set opts $mapping($limit)
+
+		if {[llength $opts] != 1 && $val != ""} {
+			return -code error "Unable to set multiple limits"
+		}
+
+		foreach opt $opts {
+			unset -nocomplain optval
+
+			if {$val != ""} {
+				catch {
+					::tuapi::syscall::rlimit set $opt $val
+				}
+				set include_help ""
+			} else {
+				set include_help "$help($opt) "
+			}
+
+			catch {
+				set optval [::tuapi::syscall::rlimit get $opt]
+			}
+
+			if {![info exists optval]} {
+				continue
+			}
+
+			puts "${include_help}$optval"
+		}
+	}
 }
