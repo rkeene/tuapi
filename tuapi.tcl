@@ -322,6 +322,9 @@ proc ::tuapi::modprobe args {
 		set module [lindex $line 2]
 
 		set alias2module($alias) $module
+		if {[string match {*\**} $alias]} {
+			set alias2module_wildcards($alias) $module
+		}
 	}
 	close $fd
 
@@ -351,7 +354,21 @@ proc ::tuapi::modprobe args {
 		foreach module $modules {
 			for {set try 0} {$try < 100} {incr try} {
 				if {![info exists alias2module($module)]} {
-					break
+					# If no exact match found, process wildcard entries
+					set found_wildcard_match 0
+					foreach alias [array name alias2module_wildcards] {
+						if {[string match $alias $module]} {
+							set module $alias2module_wildcards($alias)
+
+							set found_wildcard_match 1
+
+							break
+						}
+					}
+
+					if {!$found_wildcard_match} {
+						break
+					}
 				}
 
 				set module $alias2module($module)

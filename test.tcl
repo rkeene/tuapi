@@ -4,9 +4,14 @@ puts [exec ./build-dyn.sh]
 
 load ./tuapi.so
 
-::tuapi::modprobe /dev/fuse
+::tuapi::modprobe pci:v000014E4d0000164Csv00001028sd000001B3bc03sc00i00
 
-::tuapi::syscall::tsmf_start_svc blah /bin/true /tmp/logfile [list PATH=/bin] / 022 0 0 10
+#foreach x [list AS CORE CPU DATA FSIZE LOCKS MEMLOCK MSGQUEUE NICE NOFILE OFILE NPROC RSS RTPRIO RTTIME SIGPENDING STACK] {
+#	puts "\t\tcase [format 0x%xLU [::tuapi::internal::hash $x]]: /* $x */"
+#	puts "\t\t\tresource_id = RLIMIT_$x;"
+#	puts "\t\t\tbreak;"
+#}
+#exit
 
 foreach iface [tuapi::syscall::ifconfig] {
 #lo0:2: flags=2001000849<UP,LOOPBACK,RUNNING,MULTICAST,IPv4,VIRTUAL> mtu 8232 index 1
