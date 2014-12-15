@@ -414,7 +414,7 @@ proc ::tuapi::modprobe args {
 			# This may be wrong, but otherwise dependency matching would
 			# be harder
 			if {[string index $module 0] == "/" && [file exists $module]} {
-				set module [file rootname [file tail]]
+				set module [file rootname [file tail $module]]
 			}
 
 			for {set try 0} {$try < 100} {incr try} {
