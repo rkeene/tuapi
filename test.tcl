@@ -4,7 +4,7 @@ puts [exec ./build-dyn.sh]
 
 load ./tuapi.so
 
-::tuapi::modprobe pci:v000014E4d0000164Csv00001028sd000001B3bc03sc00i00
+puts [::tuapi::scan_and_load_kernel_modules]
 
 #foreach x [list AS CORE CPU DATA FSIZE LOCKS MEMLOCK MSGQUEUE NICE NOFILE OFILE NPROC RSS RTPRIO RTTIME SIGPENDING STACK] {
 #	puts "\t\tcase [format 0x%xLU [::tuapi::internal::hash $x]]: /* $x */"

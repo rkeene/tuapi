@@ -2,6 +2,7 @@
 
 namespace eval ::tuapi {}
 namespace eval ::tuapi::helper {}
+namespace eval ::tuapi::cache {}
 
 set ::tuapi::_mount_flags(bind) BIND
 set ::tuapi::_mount_flags(move) MOVE
@@ -292,66 +293,130 @@ proc ::tuapi::helper::foreach_line {fd sep code} {
 	uplevel 1 [list unset -nocomplain line]
 }
 
+proc ::tuapi::helper::recursive_glob {path pattern code {depth 1}} {
+	foreach filename [glob -nocomplain -directory $path -type f $pattern] {
+		uplevel $depth [list set filename $filename]
+		uplevel $depth $code
+	}
+
+	incr depth
+
+	foreach dirname [glob -nocomplain -directory $path -type d *] {
+		set dirinfo(type) unknown
+		catch {
+			file lstat $dirname dirinfo
+		}
+
+		if {$dirinfo(type) == "link"} {
+			continue
+		}
+
+		::tuapi::helper::recursive_glob $dirname $pattern $code $depth
+	}
+}
+
 proc ::tuapi::modprobe args {
+	# Process arguments
+	set options(call_insmod) 1
+	set idx 0
+	foreach arg $args {
+		switch -- $arg {
+			"-dontload" {
+				set options(call_insmod) 0
+			}
+			"--" {
+				incr idx
+				break
+			}
+			default {
+				break
+			}
+		}
+
+		incr idx
+	}
+	set args [lrange $args $idx end]
+
+	# Set initial retval
+	set retval [list]
+
 	# Set module base directory
 	set modules_dir [file join /lib/modules $::tcl_platform(osVersion)]
 
 	# Load device names
-	set devnames_file [file join $modules_dir modules.devname]
-	set fd [open $devnames_file]
-	::tuapi::helper::foreach_line $fd " " {
-		set module [lindex $line 0]
-		set device [lindex $line 1]
-		set id [lindex $line 2]
+	if {![info exists ::tuapi::cache::alias2module]} {
+		set devnames_file [file join $modules_dir modules.devname]
+		set fd [open $devnames_file]
+		::tuapi::helper::foreach_line $fd " " {
+			set module [lindex $line 0]
+			set device [lindex $line 1]
+			set id [lindex $line 2]
 
-		set id_type [string index $id 0]
-		set id_type [string map [list "c" "char" "b" "block"] $id_type]
-		set id [split [string range $id 1 end] :]
-		set id_alias "${id_type}-major-[lindex $id 0]-[lindex $id 1]"
+			set id_type [string index $id 0]
+			set id_type [string map [list "c" "char" "b" "block"] $id_type]
+			set id [split [string range $id 1 end] :]
+			set id_alias "${id_type}-major-[lindex $id 0]-[lindex $id 1]"
 
-		set "alias2module(/dev/${device})" $module
-		set alias2module($id_alias) $module
-	}
-	close $fd
-
-	# Load aliases
-	set aliases_file [file join $modules_dir modules.alias]
-	set fd [open $aliases_file]
-	::tuapi::helper::foreach_line $fd " " {
-		set alias [lindex $line 1]
-		set module [lindex $line 2]
-
-		set alias2module($alias) $module
-		if {[string match {*\**} $alias]} {
-			set alias2module_wildcards($alias) $module
+			set "alias2module(/dev/${device})" $module
+			set alias2module($id_alias) $module
 		}
-	}
-	close $fd
+		close $fd
 
-	# Load dependencies
-	set deps_file [file join $modules_dir modules.dep]
-	set fd [open $deps_file]
-	::tuapi::helper::foreach_line $fd ":" {
-		set module [string trim [lindex $line 0]]
-		set deps [split [string trim [join [lrange $line 1 end]]]]
+		# Load aliases
+		set aliases_file [file join $modules_dir modules.alias]
+		set fd [open $aliases_file]
+		::tuapi::helper::foreach_line $fd " " {
+			set alias [lindex $line 1]
+			set module [lindex $line 2]
 
-		set module_basename [file rootname [file tail $module]]
-		set module_basename_alt1 [string map [list "_" "-"] $module_basename]
-		set module_basename_alt2 [string map [list "-" "_"] $module_basename]
-
-		set alias2module($module_basename) $module
-		set alias2module($module_basename_alt1) $module
-		set alias2module($module_basename_alt2) $module
-
-		if {[llength $deps] != 0} {
-			set module2deps($module) $deps
+			set alias2module($alias) $module
+			if {[string match {*\**} $alias]} {
+				set alias2module_wildcards($alias) $module
+			}
 		}
+		close $fd
+
+		# Load dependencies
+		set deps_file [file join $modules_dir modules.dep]
+		set fd [open $deps_file]
+		::tuapi::helper::foreach_line $fd ":" {
+			set module [string trim [lindex $line 0]]
+			set deps [split [string trim [join [lrange $line 1 end]]]]
+
+			set module_basename [file rootname [file tail $module]]
+			set module_basename_alt1 [string map [list "_" "-"] $module_basename]
+			set module_basename_alt2 [string map [list "-" "_"] $module_basename]
+
+			set alias2module($module_basename) $module
+			set alias2module($module_basename_alt1) $module
+			set alias2module($module_basename_alt2) $module
+
+			if {[llength $deps] != 0} {
+				set module2deps($module) $deps
+			}
+		}
+		close $fd
+
+		set ::tuapi::cache::alias2module [array get alias2module]
+		set ::tuapi::cache::alias2module_wildcards [array get alias2module_wildcards]
+		set ::tuapi::cache::module2deps [array get module2deps]
+	} else {
+		array set alias2module $::tuapi::cache::alias2module
+		array set alias2module_wildcards $::tuapi::cache::alias2module_wildcards
+		array set module2deps $::::tuapi::cache::module2deps
 	}
-	close $fd
 
 	# Load modules
 	foreach modules $args {
 		foreach module $modules {
+			# If the module is given as an absolute path, ignore the path
+			# and process just as we would if the name were given alone
+			# This may be wrong, but otherwise dependency matching would
+			# be harder
+			if {[string index $module 0] == "/" && [file exists $module]} {
+				set module [file rootname [file tail]]
+			}
+
 			for {set try 0} {$try < 100} {incr try} {
 				if {![info exists alias2module($module)]} {
 					# If no exact match found, process wildcard entries
@@ -389,10 +454,69 @@ proc ::tuapi::modprobe args {
 
 				set module [file join $modules_dir $module]
 
-				::tuapi::syscall::insmod $module
+				if {$options(call_insmod)} {
+					::tuapi::syscall::insmod $module
+				}
+
+				lappend retval $module
 			}
 		}
 	}
+
+	return $retval
+}
+
+# Scan the various buses attached to the system and load the appropriate
+# kernel modules
+proc ::tuapi::scan_and_load_kernel_modules {{rescan_hardware 0}} {
+	set modules [list]
+
+	# Determine which modules are already loaded
+	foreach module [glob -tails -nocomplain -directory /sys/module -type d *] {
+		set alt_module1 [string map [list "_" "-"] $module]
+		set alt_module2 [string map [list "-" "_"] $module]
+
+		set loaded($module) 1
+		set loaded($alt_module1) 1
+		set loaded($alt_module2) 1
+	}
+
+	::tuapi::helper::recursive_glob /sys/devices modalias {
+		set fd [open $filename r]
+		::tuapi::helper::foreach_line $fd "\n" {
+			foreach module [::tuapi::modprobe -dontload -- $line] {
+				if {[lsearch -exact $modules $module] != -1} {
+					continue
+				}
+
+				if {![file exists $module]} {
+					continue
+				}
+
+				set rootname [file rootname [file tail $module]]
+				if {[info exists loaded($rootname)]} {
+					continue
+				}
+
+				lappend modules $module
+			}
+		}
+		close $fd
+	}
+
+	set failed_to_load [list]
+	set able_to_load [list]
+	foreach module $modules {
+		if {[catch {
+			::tuapi::modprobe $module
+		}]} {
+			lappend failed_to_load $module
+		} else {
+			lappend able_to_load $module
+		}
+	}
+
+	return [list -failed $failed_to_load -loaded $able_to_load]
 }
 
 # Create UNIX-like procs meant to be used interactively
