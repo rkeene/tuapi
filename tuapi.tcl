@@ -455,7 +455,11 @@ proc ::tuapi::modprobe args {
 				set module [file join $modules_dir $module]
 
 				if {$options(call_insmod)} {
-					::tuapi::syscall::insmod $module
+					if {[catch {
+						::tuapi::syscall::insmod $module
+					]} {
+						continue
+					}
 				}
 
 				lappend retval $module
@@ -507,9 +511,7 @@ proc ::tuapi::scan_and_load_kernel_modules {{rescan_hardware 0}} {
 	set failed_to_load [list]
 	set able_to_load [list]
 	foreach module $modules {
-		if {[catch {
-			::tuapi::modprobe $module
-		}]} {
+		if {[::tuapi::modprobe $module] == ""} {
 			lappend failed_to_load $module
 		} else {
 			lappend able_to_load $module
