@@ -457,7 +457,7 @@ proc ::tuapi::modprobe args {
 				if {$options(call_insmod)} {
 					if {[catch {
 						::tuapi::syscall::insmod $module
-					]} {
+					}]} {
 						continue
 					}
 				}
