@@ -452,11 +452,12 @@ static int tuapi_insmod(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CO
 	Tcl_Channel fd;
 	Tcl_Obj *module_filename, *module_data;
 	void *module_data_val;
+	const char *module_opts;
 	int module_data_len;
 	int read_ret, chk_ret;
 
-	if (objc < 2) {
-		Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"tuapi::syscall::insmod filename ?args ...?\"", -1));
+	if (objc < 2 || objc > 3) {
+		Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"tuapi::syscall::insmod filename ?args?\"", -1));
 
 		return(TCL_ERROR);
 	}
@@ -489,7 +490,13 @@ static int tuapi_insmod(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CO
 
 	module_data_val = Tcl_GetByteArrayFromObj(module_data, &module_data_len);
 
-	chk_ret = init_module(module_data_val, module_data_len, "");
+	if (objc == 3) {
+		module_opts = Tcl_GetString(objv[2]);
+	} else {
+		module_opts = "";
+	}
+
+	chk_ret = init_module(module_data_val, module_data_len, module_opts);
 	if (chk_ret != 0) {
 		Tcl_SetObjResult(interp, Tcl_NewStringObj(strerror(errno), -1));
 

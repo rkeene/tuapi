@@ -319,10 +319,23 @@ proc ::tuapi::modprobe args {
 	# Process arguments
 	set options(call_insmod) 1
 	set idx 0
+	set nextIsArgs 0
 	foreach arg $args {
+		if {$nextIsArgs} {
+			set options(args) $arg
+
+			set nextIsArgs 0
+
+			incr idx
+			continue
+		}
+
 		switch -- $arg {
 			"-dontload" {
 				set options(call_insmod) 0
+			}
+			"-args" {
+				set nextIsArgs 1
 			}
 			"--" {
 				incr idx
@@ -406,64 +419,126 @@ proc ::tuapi::modprobe args {
 		array set module2deps $::::tuapi::cache::module2deps
 	}
 
-	# Load modules
+	# Determine list of modules
+	set all_modules [list]
 	foreach modules $args {
 		foreach module $modules {
-			# If the module is given as an absolute path, ignore the path
-			# and process just as we would if the name were given alone
-			# This may be wrong, but otherwise dependency matching would
-			# be harder
-			if {[string index $module 0] == "/" && [file exists $module]} {
-				set module [file rootname [file tail $module]]
+			lappend all_modules $module
+		}
+	}
+
+	# Determine what modules to add the arguments to
+	if {[info exists options(args)]} {
+		foreach arg [split $options(args) " "] {
+			if {$arg == ""} {
+				continue
 			}
 
-			for {set try 0} {$try < 100} {incr try} {
-				if {![info exists alias2module($module)]} {
-					# If no exact match found, process wildcard entries
-					set found_wildcard_match 0
-					foreach alias [array name alias2module_wildcards] {
-						if {[string match $alias $module]} {
-							set module $alias2module_wildcards($alias)
+			if {[string match "*=*" $arg]} {
+				set work [split $arg =]
 
-							set found_wildcard_match 1
+				set name [lindex $work 0]
+				set value [join [lrange $work 1 end] =]
+			} else {
+				set name $arg
+				unset -nocomplain value
+			}
 
-							break
-						}
-					}
+			if {[string match "*.*" $name]} {
+				set work [split $name .]
 
-					if {!$found_wildcard_match} {
+				set module [lindex $work 0]
+				if {$module == ""} {
+					set modules [list]
+				} else {
+					set modules [list $module]
+				}
+
+				set name [join [lrange $work 1 end] .]
+			} else {
+				set modules [list]
+			}
+
+			if {[llength $modules] == 0} {
+				set modules $all_modules
+			}
+
+			foreach module $modules {
+				if {[info exists value]} {
+					append modules_args($module) "$name=$value "
+				} else {
+					append modules_args($module) "$name "
+				}
+			}
+		}
+	}
+
+	# Load modules
+	foreach module $all_modules {
+		# If the module is given as an absolute path, ignore the path
+		# and process just as we would if the name were given alone
+		# This may be wrong, but otherwise dependency matching would
+		# be harder
+		if {[string index $module 0] == "/" && [file exists $module]} {
+			set module [file rootname [file tail $module]]
+		}
+
+		for {set try 0} {$try < 100} {incr try} {
+			if {![info exists alias2module($module)]} {
+				# If no exact match found, process wildcard entries
+				set found_wildcard_match 0
+				foreach alias [array name alias2module_wildcards] {
+					if {[string match $alias $module]} {
+						set module $alias2module_wildcards($alias)
+
+						set found_wildcard_match 1
+
 						break
 					}
 				}
 
-				set module $alias2module($module)
-			}
-
-			if {[info exists module2deps($module)]} {
-				set load $module2deps($module)
-			} else {
-				set load [list]
-			}
-
-			lappend load $module
-
-			foreach module $load {
-				if {[string match "/dev/*" $module]} {
-					return -code error "Unable to lookup device node module for $module"
+				if {!$found_wildcard_match} {
+					break
 				}
+			}
 
-				set module [file join $modules_dir $module]
+			set module $alias2module($module)
+		}
 
-				if {$options(call_insmod)} {
-					if {[catch {
+		if {[info exists module2deps($module)]} {
+			set load $module2deps($module)
+		} else {
+			set load [list]
+		}
+
+		lappend load $module
+
+		foreach module $load {
+			if {[string match "/dev/*" $module]} {
+				return -code error "Unable to lookup device node module for $module"
+			}
+
+			set module [file join $modules_dir $module]
+
+			unset -nocomplain module_args
+			set module_short [file rootname [file tail $module]]
+			if {[info exists modules_args($module_short)]} {
+				set module_args [string trim $modules_args($module_short)]
+			}
+
+			if {$options(call_insmod)} {
+				if {[catch {
+					if {[info exists module_args]} {
+						::tuapi::syscall::insmod $module $module_args
+					} else {
 						::tuapi::syscall::insmod $module
-					}]} {
-						continue
 					}
+				}]} {
+					continue
 				}
-
-				lappend retval $module
 			}
+
+			lappend retval $module
 		}
 	}
 
