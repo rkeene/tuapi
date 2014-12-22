@@ -487,18 +487,29 @@ proc ::tuapi::modprobe args {
 			if {![info exists alias2module($module)]} {
 				# If no exact match found, process wildcard entries
 				set found_wildcard_match 0
+				set tmp_matched_modules [list]
 				foreach alias [array name alias2module_wildcards] {
 					if {[string match $alias $module]} {
 						set module $alias2module_wildcards($alias)
 
-						set found_wildcard_match 1
+						lappend tmp_matched_modules $module
 
-						break
+						incr found_wildcard_match 1
 					}
 				}
 
 				if {!$found_wildcard_match} {
 					break
+				}
+
+				if {$found_wildcard_match > 1} {
+					# Multiple matches, try to pick the best one
+					foreach tmp_module $tmp_matched_modules {
+						# First, prefer things that do not contain generic
+						if {![string match "*generic*" $tmp_module]} {
+							set module $tmp_module
+						}
+					}
 				}
 			}
 
@@ -586,7 +597,7 @@ proc ::tuapi::scan_and_load_kernel_modules {{rescan_hardware 0}} {
 	set failed_to_load [list]
 	set able_to_load [list]
 	foreach module $modules {
-		if {[::tuapi::modprobe $module] == ""} {
+		if {[::tuapi::modprobe -args {ata_generic.all_generic_ide=1} $module] == ""} {
 			lappend failed_to_load $module
 		} else {
 			lappend able_to_load $module
