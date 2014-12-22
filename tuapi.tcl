@@ -394,7 +394,7 @@ proc ::tuapi::modprobe args {
 		set fd [open $deps_file]
 		::tuapi::helper::foreach_line $fd ":" {
 			set module [string trim [lindex $line 0]]
-			set deps [split [string trim [join [lrange $line 1 end]]]]
+			set deps [lreverse [split [string trim [join [lrange $line 1 end]]]]]
 
 			set module_basename [file rootname [file tail $module]]
 			set module_basename_alt1 [string map [list "_" "-"] $module_basename]
