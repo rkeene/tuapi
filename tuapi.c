@@ -2246,6 +2246,28 @@ static int tuapi_klogctl(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *C
 	return(TCL_ERROR);
 }
 
+static int tuapi_waitpid(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
+	pid_t child;
+	int status;
+
+	child = waitpid(-1, &status, WNOHANG);
+	if (child < 0) {
+		if (errno != ECHILD) {
+			Tcl_SetObjResult(interp, Tcl_NewStringObj(strerror(errno), -1));
+
+			return(TCL_ERROR);
+		} else {
+			child = 0;
+		}
+	}
+
+	if (child != 0) {
+		Tcl_SetObjResult(interp, Tcl_NewWideIntObj(child));
+	}
+
+	return(TCL_OK);
+}
+
 #ifndef DISABLE_UNIX_SOCKETS
 struct tuapi_socket_unix__chan_id {
 	int fd;
@@ -2995,6 +3017,7 @@ int Tuapi_Init(Tcl_Interp *interp) {
 	Tcl_CreateObjCommand(interp, "::tuapi::syscall::chroot", tuapi_chroot, NULL, NULL);
 	Tcl_CreateObjCommand(interp, "::tuapi::syscall::pivot_root", tuapi_pivot_root, NULL, NULL);
 	Tcl_CreateObjCommand(interp, "::tuapi::syscall::kill", tuapi_kill, NULL, NULL);
+	Tcl_CreateObjCommand(interp, "::tuapi::syscall::waitpid", tuapi_waitpid, NULL, NULL);
 	Tcl_CreateObjCommand(interp, "::tuapi::syscall::ps", tuapi_ps, NULL, NULL);
 	Tcl_CreateObjCommand(interp, "::tuapi::syscall::execve", tuapi_execve, NULL, NULL);
 	Tcl_CreateObjCommand(interp, "::tuapi::syscall::rlimit", tuapi_rlimit, NULL, NULL);
