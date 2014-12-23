@@ -2747,11 +2747,14 @@ static int tuapi_tsmf_start_svc(ClientData cd, Tcl_Interp *interp, int objc, Tcl
 
 	if (child != 0) {
 		/* 4.parent. Get PGID from child */
-		/* 4.parent.a. Close write end of pipe -- we are read-only */
+		/* 4.parent.a. Open log file */
+		log_fd = open(logfile, O_WRONLY | O_CREAT | O_APPEND, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+
+		/* 4.parent.b. Close write end of pipe -- we are read-only */
 		close(fds[1]);
 		fd = fds[0];
 
-		/* 4.parent.b. Read process group ID of child from pipe */
+		/* 4.parent.c. Read process group ID of child from pipe */
 		select_timeout.tv_sec = timeout_val;
 		select_timeout.tv_usec = 0;
 
@@ -2768,6 +2771,15 @@ static int tuapi_tsmf_start_svc(ClientData cd, Tcl_Interp *interp, int objc, Tcl
 
 			Tcl_SetObjResult(interp, Tcl_NewStringObj("timeout", -1));
 
+			currtime = time(NULL);
+			strftime(logmsg, sizeof(logmsg), "[ %b %e %H:%M:%S ", localtime(&currtime));
+			write(log_fd, logmsg, strlen(logmsg));
+
+			snprintf(logmsg, sizeof(logmsg), "Method \"start\" timed out after %i seconds ]\n", (int) timeout_val);
+			write(log_fd, logmsg, strlen(logmsg));
+
+			close(log_fd);
+
 			return(TCL_ERROR);
 		}
 
@@ -2775,25 +2787,52 @@ static int tuapi_tsmf_start_svc(ClientData cd, Tcl_Interp *interp, int objc, Tcl
 			read_ret = read(fd, &child_pgid, sizeof(child_pgid));
 		}
 
-		/* 4.parent.c. Close read end of pipe */
+		/* 4.parent.d. Close read end of pipe */
 		close(fd);
 
-		/* 4.parent.d. Verify read was meaningful */
+		/* 4.parent.e. Verify read was meaningful */
 		if (read_ret != sizeof(child_pgid)) {
 			Tcl_SetObjResult(interp, Tcl_NewStringObj("failed to communicate with started service", -1));
 
+			currtime = time(NULL);
+			strftime(logmsg, sizeof(logmsg), "[ %b %e %H:%M:%S ", localtime(&currtime));
+			write(log_fd, logmsg, strlen(logmsg));
+
+			snprintf(logmsg, sizeof(logmsg), "Method \"start\" failed: communication with started service broken ]\n");
+			write(log_fd, logmsg, strlen(logmsg));
+
+			close(log_fd);
+
 			return(TCL_ERROR);
 		}
 
-		/* 4.parent.e. If the PGID given is actually an error, return error */
+		/* 4.parent.f. If the PGID given is actually an error, return error */
 		if (child_pgid == -1) {
 			Tcl_SetObjResult(interp, Tcl_NewStringObj("service failed to start", -1));
 
+			currtime = time(NULL);
+			strftime(logmsg, sizeof(logmsg), "[ %b %e %H:%M:%S ", localtime(&currtime));
+			write(log_fd, logmsg, strlen(logmsg));
+
+			snprintf(logmsg, sizeof(logmsg), "Method \"start\" failed ]\n");
+			write(log_fd, logmsg, strlen(logmsg));
+
+			close(log_fd);
+
 			return(TCL_ERROR);
 		}
 
-		/* 4.parent.f. Return PGID to Tcl */
+		/* 4.parent.g. Return PGID to Tcl */
 		Tcl_SetObjResult(interp, Tcl_NewWideIntObj((Tcl_WideInt) child_pgid));
+
+		currtime = time(NULL);
+		strftime(logmsg, sizeof(logmsg), "[ %b %e %H:%M:%S ", localtime(&currtime));
+		write(log_fd, logmsg, strlen(logmsg));
+
+		snprintf(logmsg, sizeof(logmsg), "Method \"start\" completed, process group = %lu ]\n", (unsigned long) child_pgid);
+		write(log_fd, logmsg, strlen(logmsg));
+
+		close(log_fd);
 
 		return(TCL_OK);
 	}
