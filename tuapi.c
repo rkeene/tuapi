@@ -3,6 +3,7 @@
 #include <sys/syscall.h>
 #include <sys/termios.h>
 #include <netinet/in.h>
+#include <sys/reboot.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <sys/select.h>
@@ -793,6 +794,21 @@ static int tuapi_kill(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONS
 	}
 
 	return(TCL_OK);
+}
+
+static int tuapi_reboot(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
+	sync();
+	reboot(RB_AUTOBOOT);
+
+	Tcl_SetObjResult(interp, Tcl_NewStringObj(strerror(errno), -1));
+
+	return(TCL_ERROR);
+}
+
+static int tuapi_eject(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
+	Tcl_SetObjResult(interp, Tcl_NewStringObj("not implemented", -1));
+
+	return(TCL_ERROR);
 }
 
 static int tuapi_ps(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
@@ -3004,6 +3020,7 @@ int Tuapi_Init(Tcl_Interp *interp) {
 
 	/* Block or char device related commands */
 	Tcl_CreateObjCommand(interp, "::tuapi::syscall::losetup", tuapi_losetup, NULL, NULL);
+	Tcl_CreateObjCommand(interp, "::tuapi::syscall::eject", tuapi_eject, NULL, NULL);
 
 	/* Filesystem related commands */
 	Tcl_CreateObjCommand(interp, "::tuapi::syscall::mount", tuapi_mount, NULL, NULL);
@@ -3021,6 +3038,7 @@ int Tuapi_Init(Tcl_Interp *interp) {
 	Tcl_CreateObjCommand(interp, "::tuapi::syscall::ps", tuapi_ps, NULL, NULL);
 	Tcl_CreateObjCommand(interp, "::tuapi::syscall::execve", tuapi_execve, NULL, NULL);
 	Tcl_CreateObjCommand(interp, "::tuapi::syscall::rlimit", tuapi_rlimit, NULL, NULL);
+	Tcl_CreateObjCommand(interp, "::tuapi::syscall::reboot", tuapi_reboot, NULL, NULL);
 
 	/* Network related commands */
 	Tcl_CreateObjCommand(interp, "::tuapi::syscall::ifconfig", tuapi_ifconfig, NULL, NULL);
