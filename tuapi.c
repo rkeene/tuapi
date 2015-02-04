@@ -2284,6 +2284,41 @@ static int tuapi_waitpid(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *C
 	return(TCL_OK);
 }
 
+static int tuapi_settimeofday(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
+	struct timeval tv;
+	Tcl_WideInt tv_sec_val, tv_usec_val;
+	int settimeofday_ret, tcl_ret;
+
+	if (objc != 3) {
+		Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"::tuapi::syscall::settimeofday seconds microseconds\"", -1));
+
+		return(TCL_ERROR);
+	}
+
+	tcl_ret = Tcl_GetWideIntFromObj(interp, objv[1], &tv_sec_val);
+	if (tcl_ret != TCL_OK) {
+		return(tcl_ret);
+	}
+
+	tcl_ret = Tcl_GetWideIntFromObj(interp, objv[2], &tv_usec_val);
+	if (tcl_ret != TCL_OK) {
+		return(tcl_ret);
+	}
+
+	tv.tv_sec = tv_sec_val;
+	tv.tv_usec = tv_usec_val; 
+
+	settimeofday_ret = settimeofday(&tv, NULL);
+
+	if (settimeofday_ret < 0) {
+		Tcl_SetObjResult(interp, Tcl_NewStringObj(strerror(errno), -1));
+
+		return(TCL_ERROR);
+	}
+
+	return(TCL_OK);
+}
+
 #ifndef DISABLE_UNIX_SOCKETS
 struct tuapi_socket_unix__chan_id {
 	int fd;
@@ -3017,6 +3052,7 @@ int Tuapi_Init(Tcl_Interp *interp) {
 	Tcl_CreateObjCommand(interp, "::tuapi::syscall::hostname", tuapi_hostname, NULL, NULL);
 	Tcl_CreateObjCommand(interp, "::tuapi::syscall::domainname", tuapi_domainname, NULL, NULL);
 	Tcl_CreateObjCommand(interp, "::tuapi::syscall::klogctl", tuapi_klogctl, NULL, NULL);
+	Tcl_CreateObjCommand(interp, "::tuapi::syscall::settimeofday", tuapi_settimeofday, NULL, NULL);
 
 	/* Block or char device related commands */
 	Tcl_CreateObjCommand(interp, "::tuapi::syscall::losetup", tuapi_losetup, NULL, NULL);
