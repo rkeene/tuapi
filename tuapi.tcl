@@ -558,7 +558,38 @@ proc ::tuapi::modprobe args {
 
 # Scan the various buses attached to the system and load the appropriate
 # kernel modules
-proc ::tuapi::scan_and_load_kernel_modules {{rescan_hardware 0}} {
+proc ::tuapi::scan_and_load_kernel_modules args {
+	set parameters [list "ata_generic.all_generic_ide=1"]
+	foreach arg $args {
+		if {[info exists var_to_set]} {
+			set $var_to_set $arg
+
+			unset var_to_set
+
+			continue
+		}
+
+		if {[info exists var_to_lappend]} {
+			lappend $var_to_lappend $arg
+
+			unset var_to_lappend
+
+			continue
+		}
+
+		switch -- $arg {
+			"-arg" {
+				set var_to_lappend parameters
+			}
+			"-args" {
+				set var_to_set parameters
+			}
+			default {
+				return -code error "Unknown option: $arg"
+			}
+		}
+	}
+
 	set modules [list]
 
 	# Determine which modules are already loaded
@@ -597,7 +628,7 @@ proc ::tuapi::scan_and_load_kernel_modules {{rescan_hardware 0}} {
 	set failed_to_load [list]
 	set able_to_load [list]
 	foreach module $modules {
-		if {[::tuapi::modprobe -args {ata_generic.all_generic_ide=1} $module] == ""} {
+		if {[::tuapi::modprobe -args $parameters $module] == ""} {
 			lappend failed_to_load $module
 		} else {
 			lappend able_to_load $module
