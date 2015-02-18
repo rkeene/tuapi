@@ -429,7 +429,8 @@ proc ::tuapi::modprobe args {
 
 	# Determine what modules to add the arguments to
 	if {[info exists options(args)]} {
-		foreach arg [split $options(args) " "] {
+		foreach arg [split $options(args) " \n\t"] {
+			set arg [string trim $arg]
 			if {$arg == ""} {
 				continue
 			}
