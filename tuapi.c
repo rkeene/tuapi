@@ -797,12 +797,78 @@ static int tuapi_kill(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONS
 }
 
 static int tuapi_reboot(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
-	sync();
-	reboot(RB_AUTOBOOT);
+	Tcl_Obj *cmd_obj;
+	int cmd;
+	int reboot_ret;
 
-	Tcl_SetObjResult(interp, Tcl_NewStringObj(strerror(errno), -1));
+	if (objc == 2) {
+		cmd_obj = objv[1];
 
-	return(TCL_ERROR);
+		switch (tuapi_internal_simplehash_obj(cmd_obj)) {
+			case 0x2be1946: /* LINUX_REBOOT_CMD_CAD_OFF */
+			case 0x666e6344: /* RB_DISABLE_CAD */
+			case 0x9e3ce644: /* DISABLE_CAD */
+				cmd = RB_DISABLE_CAD;
+
+				break;
+			case 0xe8057c4e: /* LINUX_REBOOT_CMD_CAD_ON */
+			case 0xf8dc444: /* RB_ENABLE_CAD */
+			case 0x1a7d6144: /* ENABLE_CAD */
+				cmd = RB_ENABLE_CAD;
+
+				break;
+			case 0x95bfa454: /* LINUX_REBOOT_CMD_HALT */
+			case 0x3210da4d: /* RB_HALT_SYSTEM */
+			case 0xca425f4d: /* HALT_SYSTEM */
+			case 0x9106654: /* HALT */
+				cmd = RB_HALT_SYSTEM;
+
+				break;
+			case 0xdb55d8c6: /* LINUX_REBOOT_CMD_POWER_OFF */
+			case 0xf07700c6: /* RB_POWER_OFF */
+			case 0x645ce1c6: /* POWER_OFF */
+				cmd = 0x4321fedc;
+
+				break;
+			case 0x73ff83d4: /* LINUX_REBOOT_CMD_RESTART */
+			case 0x3cd0e254: /* RB_AUTOBOOT */
+			case 0xb9f8b5d4: /* AUTOBOOT */
+			case 0x3a357fd4: /* RESTART */
+			case 0x5852add4: /* REBOOT */
+				cmd = RB_AUTOBOOT;
+
+				break;
+			default:
+				Tcl_SetObjResult(interp, Tcl_NewStringObj("unknown or ambiguous subcommand: must be DISABLE_CAD, ENABLE_CAD, HALT, POWER_OFF, or RESTART", -1));
+
+				return(TCL_ERROR);
+		}
+	} else if (objc == 1) {
+		cmd = RB_AUTOBOOT;
+	} else {
+		Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"::tuapi::syscall::reboot ?command?", -1));
+
+		return(TCL_ERROR);
+	}
+
+	switch (cmd) {
+		case RB_ENABLE_CAD:
+		case RB_DISABLE_CAD:
+			/* No need to sync for these operations */
+			break;
+		default:
+			sync();
+			break;
+	}
+
+	reboot_ret = reboot(cmd);
+	if (reboot_ret != 0) {
+		Tcl_SetObjResult(interp, Tcl_NewStringObj(strerror(errno), -1));
+
+		return(TCL_ERROR);
+	}
+
+	return(TCL_OK);
 }
 
 static int tuapi_eject(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
