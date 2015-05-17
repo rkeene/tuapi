@@ -84,6 +84,11 @@ static int init_module(void *val, unsigned long len, const char *args) {
 	return(syscall(SYS_init_module, val, len, args));
 }
 #endif
+#ifdef SYS_delete_module
+static int delete_module(const char *name, int flags) {
+	return(syscall(SYS_delete_module, name, flags));
+}
+#endif
 #ifdef SYS_pivot_root
 static int pivot_root(const char *new_root, const char *put_old) {
 	return(syscall(SYS_pivot_root, new_root, put_old));
@@ -508,9 +513,28 @@ static int tuapi_insmod(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CO
 }
 
 static int tuapi_rmmod(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
-	Tcl_SetObjResult(interp, Tcl_NewStringObj("not implemented", -1));
+	char *module;
+	int idx;
+	int delete_module_ret;
 
-	return(TCL_ERROR);
+	if (objc < 2) {
+		Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"tuapi::syscall::rmmod module ?module...?", -1));
+
+		return(TCL_ERROR);
+	}
+
+	for (idx = 1; idx < objc; idx++) {
+		module = Tcl_GetString(objv[idx]);
+
+		delete_module_ret = delete_module(module, O_NONBLOCK);
+		if (delete_module_ret != 0) {
+			Tcl_SetObjResult(interp, Tcl_ObjPrintf("unable to remove \"%s\": %s", module, strerror(errno)));
+
+			return(TCL_ERROR);
+		}
+	}
+
+	return(TCL_OK);
 }
 
 static int tuapi_lsmod(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
