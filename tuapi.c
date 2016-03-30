@@ -1289,9 +1289,11 @@ static int tuapi_ifconfig_info(ClientData cd, Tcl_Interp *interp, int objc, Tcl_
 			case ARPHRD_HWX25:
 				link_encap = "hwx25";
 				break;
+#ifdef ARPHRD_CAN
 			case ARPHRD_CAN:
 				link_encap = "can";
 				break;
+#endif
 			case ARPHRD_PPP:
 				link_encap = "ppp";
 				break;
