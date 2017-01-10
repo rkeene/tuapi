@@ -667,7 +667,7 @@ static int tuapi_setuid(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CO
 
 	Tcl_SetObjResult(interp, Tcl_NewStringObj("", -1));
 
-	return(TCL_ERROR);
+	return(TCL_OK);
 }
 
 static int tuapi_getuid(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
