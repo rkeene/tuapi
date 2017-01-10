@@ -3,8 +3,7 @@ Tcl UNIX API
 
 Linux only, currently.
 
-
-package require tuapi 0.7
+package require tuapi 0.8
 
 High-level Interfaces
 ---------------------
