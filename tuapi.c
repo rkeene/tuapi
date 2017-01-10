@@ -643,7 +643,29 @@ static int tuapi_mknod(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CON
 }
 
 static int tuapi_setuid(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
-	Tcl_SetObjResult(interp, Tcl_NewStringObj("not implemented", -1));
+	Tcl_WideInt tclUid;
+	uid_t uid;
+	int chk_ret;
+
+	if (objc != 2) {
+		Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"::tuapi::syscall::setuid uid\"", -1));
+	}
+
+	chk_ret = Tcl_GetWideIntFromObj(interp, objv[1], &tclUid);
+	if (chk_ret != TCL_OK) {
+		return(chk_ret);
+	}
+
+	uid = tclUid;
+
+	chk_ret = setuid(uid);
+	if (chk_ret != 0) {
+		Tcl_SetObjResult(interp, Tcl_NewStringObj("setuid failed", -1));
+
+		return(TCL_ERROR);
+	}
+
+	Tcl_SetObjResult(interp, Tcl_NewStringObj("", -1));
 
 	return(TCL_ERROR);
 }
