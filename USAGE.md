@@ -4,7 +4,7 @@ Tcl UNIX API
 Linux only, currently.
 
 
-package require tuapi 0.6
+package require tuapi 0.7
 
 High-level Interfaces
 ---------------------
@@ -32,7 +32,8 @@ Low-level Interfaces (Linux)
 	::tuapi::syscall::swapon <file>
 	::tuapi::syscall::swapoff <file>
 	::tuapi::syscall::mknod (not implemented)
-	::tuapi::syscall::getuid (not implemented)
+	::tuapi::syscall::setuid <uid>
+	::tuapi::syscall::getuid
 	::tuapi::syscall::chroot <path>
 	::tuapi::syscall::pivot_root <newRoot> <putOld>
 	::tuapi::syscall::kill <pid> <signal>
