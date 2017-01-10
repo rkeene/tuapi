@@ -642,10 +642,28 @@ static int tuapi_mknod(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CON
 	return(TCL_ERROR);
 }
 
-static int tuapi_getuid(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
+static int tuapi_setuid(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
 	Tcl_SetObjResult(interp, Tcl_NewStringObj("not implemented", -1));
 
 	return(TCL_ERROR);
+}
+
+static int tuapi_getuid(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
+	uid_t uid;
+	Tcl_WideInt tclUid;
+
+	if (objc != 1) {
+		Tcl_SetObjResult(interp, Tcl_NewStringObj("wrong # args: should be \"::tuapi::syscall::getuid\"", -1));
+
+		return(TCL_ERROR);
+	}
+
+	uid = getuid();
+	tclUid = uid;
+
+	Tcl_SetObjResult(interp, Tcl_NewWideIntObj(tclUid));
+
+	return(TCL_OK);
 }
 
 static int tuapi_kill(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
@@ -3158,6 +3176,7 @@ int Tuapi_Init(Tcl_Interp *interp) {
 	Tcl_CreateObjCommand(interp, "::tuapi::syscall::mknod", tuapi_mknod, NULL, NULL);
 
 	/* Process related commands */
+	Tcl_CreateObjCommand(interp, "::tuapi::syscall::setuid", tuapi_setuid, NULL, NULL);
 	Tcl_CreateObjCommand(interp, "::tuapi::syscall::getuid", tuapi_getuid, NULL, NULL);
 	Tcl_CreateObjCommand(interp, "::tuapi::syscall::chroot", tuapi_chroot, NULL, NULL);
 	Tcl_CreateObjCommand(interp, "::tuapi::syscall::pivot_root", tuapi_pivot_root, NULL, NULL);
