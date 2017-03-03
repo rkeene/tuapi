@@ -1457,6 +1457,7 @@ static int tuapi_ifconfig_info(ClientData cd, Tcl_Interp *interp, int objc, Tcl_
 static int tuapi_ifconfig_conf(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[], int sock, int sock_v4, int sock_v6) {
 	Tcl_Obj *option_name_obj, *option_val_obj;
 	Tcl_Obj **flags_objv;
+	Tcl_WideInt option_val_wide;
 	struct ifreq iface_req;
 	struct sockaddr *tmp_ioctl_addr;
 	const char *iface;
@@ -1478,6 +1479,7 @@ static int tuapi_ifconfig_conf(ClientData cd, Tcl_Interp *interp, int objc, Tcl_
 
 	for (; objc > 0; objc--,objv++) {
 		/* Prepare for an ioctl() */
+		memset(&iface_req, 0, sizeof(iface_req));
 		strcpy(iface_req.ifr_name, iface);
 		tmp_ioctl = -1;
 
@@ -1575,7 +1577,6 @@ static int tuapi_ifconfig_conf(ClientData cd, Tcl_Interp *interp, int objc, Tcl_
 
 				break;
 			case 0x5e9d03e3: /* metric */
-			case 0x1b7a75: /* mtu */
 			case 0x7c3891f2: /* hwaddr */
 			case 0xbf72a969: /* addmulti */
 			case 0xba708969: /* delmulti */
@@ -1583,6 +1584,22 @@ static int tuapi_ifconfig_conf(ClientData cd, Tcl_Interp *interp, int objc, Tcl_
 					Tcl_SetObjResult(interp, Tcl_ObjPrintf("option \"%s\" unsupported", Tcl_GetString(option_name_obj)));
 
 					return(TCL_ERROR);
+				break;
+			case 0x1b7a75: /* mtu */
+				tcl_ret = Tcl_GetWideIntFromObj(interp, option_val_obj, &option_val_wide);
+				if (tcl_ret != TCL_OK) {
+					return(tcl_ret);
+				}
+
+				iface_req.ifr_mtu = option_val_wide;
+
+				ioctl_ret = ioctl(sock, SIOCSIFMTU, &iface_req);
+				if (ioctl_ret != 0) {
+					Tcl_SetObjResult(interp, Tcl_NewStringObj(strerror(errno), -1));
+
+					return(TCL_ERROR);
+				}
+
 				break;
 			case 0x4e9aeaf3: /* address */
 				if (tmp_ioctl == -1) {
