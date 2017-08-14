@@ -4,6 +4,7 @@
 #include <sys/termios.h>
 #include <netinet/in.h>
 #include <sys/reboot.h>
+#include <sys/prctl.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <sys/select.h>
@@ -930,6 +931,35 @@ static int tuapi_reboot(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CO
 		Tcl_SetObjResult(interp, Tcl_NewStringObj(strerror(errno), -1));
 
 		return(TCL_ERROR);
+	}
+
+	return(TCL_OK);
+}
+
+static int tuapi_set_thread_name(ClientData cd, Tcl_Interp *interp, int objc, Tcl_Obj *CONST objv[]) {
+	char *name;
+
+	if (objc == 2) {
+#ifdef PR_SET_NAME
+		name = Tcl_GetString(objv[1]);
+		prctl(PR_SET_NAME, (unsigned long) name, 0, 0, 0);
+#else
+		Tcl_SetObjResult(interp, Tcl_NewStringObj("unsupported", -1));
+		return(TCL_ERROR);
+#endif
+	} else {
+#ifdef PR_GET_NAME
+		name = malloc(17);
+
+		prctl(PR_GET_NAME, (unsigned long) name, 0, 0, 0);
+
+		Tcl_SetObjResult(interp, Tcl_NewStringObj(name, -1));
+
+		free(name);
+#else
+		Tcl_SetObjResult(interp, Tcl_NewStringObj("unsupported", -1));
+		return(TCL_ERROR);
+#endif
 	}
 
 	return(TCL_OK);
@@ -3225,6 +3255,7 @@ int Tuapi_Init(Tcl_Interp *interp) {
 	Tcl_CreateObjCommand(interp, "::tuapi::syscall::execve", tuapi_execve, NULL, NULL);
 	Tcl_CreateObjCommand(interp, "::tuapi::syscall::rlimit", tuapi_rlimit, NULL, NULL);
 	Tcl_CreateObjCommand(interp, "::tuapi::syscall::reboot", tuapi_reboot, NULL, NULL);
+	Tcl_CreateObjCommand(interp, "::tuapi::syscall::set_thread_name", tuapi_set_thread_name, NULL, NULL);
 
 	/* Network related commands */
 	Tcl_CreateObjCommand(interp, "::tuapi::syscall::ifconfig", tuapi_ifconfig, NULL, NULL);
