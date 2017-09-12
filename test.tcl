@@ -4,7 +4,7 @@ puts [exec ./build-dyn.sh]
 
 load ./tuapi.so
 
-puts [::tuapi::scan_and_load_kernel_modules]
+#puts [::tuapi::scan_and_load_kernel_modules]
 
 #foreach x [list AS CORE CPU DATA FSIZE LOCKS MEMLOCK MSGQUEUE NICE NOFILE OFILE NPROC RSS RTPRIO RTTIME SIGPENDING STACK] {
 #	puts "\t\tcase [format 0x%xLU [::tuapi::internal::hash $x]]: /* $x */"
@@ -39,4 +39,4 @@ foreach iface [tuapi::syscall::ifconfig] {
 }
 
 #tuapi::syscall::route add 1.2.3.4 255.255.255.255
-tuapi::syscall::ifconfig dummy0 address 1.2.3.4 netmask 255.255.255.0 flags [list UP RUNNING BROADCAST MULTICAST]
+#tuapi::syscall::ifconfig dummy0 address 1.2.3.4 netmask 255.255.255.0 flags [list UP RUNNING BROADCAST MULTICAST]
